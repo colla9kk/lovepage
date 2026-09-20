@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Heart, Image as ImageIcon, Calendar, Sparkles, Clock, QrCode, Copy, Check, Download, Music } from 'lucide-react';
+import { Heart, Image as ImageIcon, Calendar, Sparkles, Clock, QrCode, Copy, Check, Download, Music, Upload, CreditCard, Lock, CheckCircle2, X, Loader2 } from 'lucide-react';
 
 function ChuvaDeCoracoes() {
   const [coracoes, setCoracoes] = useState<Array<{ id: number; left: number; delay: number; duration: number; size: number }>>([]);
@@ -74,6 +74,14 @@ export default function Home() {
   const [resultado, setResultado] = useState<{ url: string; qrCode: string } | null>(null);
   const [copiado, setCopiado] = useState(false);
 
+  // Estados do Mercado Pago PIX Real
+  const [modalPixOpen, setModalPixOpen] = useState(false);
+  const [pixQrCodeBase64, setPixQrCodeBase64] = useState<string | null>(null);
+  const [pixCopiaECola, setPixCopiaECola] = useState<string>('');
+  const [paymentId, setPaymentId] = useState<string | number | null>(null);
+  const [pixCopiado, setPixCopiado] = useState(false);
+  const [pagamentoAprovado, setPagamentoAprovado] = useState(false);
+
   useEffect(() => {
     const calcularTempo = () => {
       if (!dataInicio) return;
@@ -92,24 +100,93 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [dataInicio]);
 
-  const gerarPagina = async () => {
+  const handleUploadFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 8 * 1024 * 1024) {
+        alert('A fotografia deve ter um tamanho inferior a 8MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFotoUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Gerar cobrança PIX real no Mercado Pago ao clicar no botão
+  const iniciarCheckout = async () => {
+    if (!nomeCasal.trim()) {
+      alert('Por favor, introduza o nome do casal.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/pages', {
+      const res = await fetch('http://localhost:5000/api/checkout/pix', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nomeCasal, dataInicio, mensagem, fotoUrl, spotifyTrackId }),
+        body: JSON.stringify({ nomeCasal }),
       });
       const data = await res.json();
+
       if (data.success) {
-        setResultado({ url: data.url, qrCode: data.qrCode });
+        setPixQrCodeBase64(data.qrCodeBase64);
+        setPixCopiaECola(data.qrCodeCopiaCola);
+        setPaymentId(data.paymentId);
+        setPagamentoAprovado(false);
+        setModalPixOpen(true);
       } else {
-        alert('Erro no servidor: ' + (data.error || 'Não foi possível gerar.'));
+        alert('Erro ao gerar PIX do Mercado Pago.');
       }
     } catch (e) {
       alert('Certifique-se de que o backend está a rodar na porta 5000!');
     }
     setLoading(false);
+  };
+
+  // Checar se o pagamento foi aprovado a cada 3 segundos
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (modalPixOpen && paymentId && !pagamentoAprovado) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`http://localhost:5000/api/checkout/status/${paymentId}`);
+          const data = await res.json();
+
+          if (data.isApproved) {
+            setPagamentoAprovado(true);
+            clearInterval(interval);
+
+            // Gerar a página do casal assim que o pagamento for aprovado
+            const pageRes = await fetch('http://localhost:5000/api/pages', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ nomeCasal, dataInicio, mensagem, fotoUrl, spotifyTrackId }),
+            });
+            const pageData = await pageRes.json();
+            if (pageData.success) {
+              setResultado({ url: pageData.url, qrCode: pageData.qrCode });
+              setTimeout(() => setModalPixOpen(false), 1500);
+            }
+          }
+        } catch (e) {
+          console.error('Verificando pagamento...', e);
+        }
+      }, 3000);
+    }
+
+    return () => clearInterval(interval);
+  }, [modalPixOpen, paymentId, pagamentoAprovado, nomeCasal, dataInicio, mensagem, fotoUrl, spotifyTrackId]);
+
+  const copiarPix = () => {
+    if (pixCopiaECola) {
+      navigator.clipboard.writeText(pixCopiaECola);
+      setPixCopiado(true);
+      setTimeout(() => setPixCopiado(false), 2500);
+    }
   };
 
   const copiarLink = () => {
@@ -121,18 +198,19 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans relative">
       <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur p-4 flex justify-between items-center px-6">
         <div className="flex items-center gap-2 text-rose-500 font-bold text-xl">
           <Heart className="fill-rose-500" size={24} />
           <span>LovePage</span>
         </div>
         <button
-          onClick={gerarPagina}
+          onClick={iniciarCheckout}
           disabled={loading}
-          className="bg-rose-600 hover:bg-rose-500 text-white font-medium px-5 py-2.5 rounded-full transition shadow-lg shadow-rose-950 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          className="bg-rose-600 hover:bg-rose-500 text-white font-medium px-6 py-2.5 rounded-full transition shadow-lg shadow-rose-950 flex items-center gap-2 cursor-pointer disabled:opacity-50"
         >
-          <QrCode size={18} /> {loading ? 'Gerando...' : 'Gerar QR Code & Link'}
+          {loading ? <Loader2 className="animate-spin" size={18} /> : <CreditCard size={18} />}
+          {loading ? 'Gerando PIX...' : 'Finalizar & Gerar Presente (R$ 19,90)'}
         </button>
       </header>
 
@@ -167,25 +245,60 @@ export default function Home() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1 flex items-center gap-2">
-                <ImageIcon size={16} /> URL da Foto do Casal
+              <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                <ImageIcon size={16} /> Foto do Casal
               </label>
-              <input type="text" value={fotoUrl} onChange={(e) => setFotoUrl(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500" />
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleUploadFoto}
+                    className="hidden"
+                    id="foto-upload"
+                  />
+                  <label
+                    htmlFor="foto-upload"
+                    className="bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 text-xs px-4 py-2.5 rounded-lg cursor-pointer flex items-center gap-2 transition font-medium"
+                  >
+                    <Upload size={14} /> Selecionar Fotografia do Telemóvel/PC
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-500">Ou cole a URL direta de uma imagem da internet:</p>
+                <input
+                  type="text"
+                  value={fotoUrl.startsWith('data:') ? '[Fotografia enviada do ficheiro local]' : fotoUrl}
+                  onChange={(e) => setFotoUrl(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  placeholder="https://..."
+                />
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1">Carta / Mensagem Romântica</label>
               <textarea rows={4} value={mensagem} onChange={(e) => setMensagem(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500" />
             </div>
+
+            <button
+              onClick={iniciarCheckout}
+              disabled={loading}
+              className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-rose-950 flex items-center justify-center gap-2 text-base mt-4 cursor-pointer disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="animate-spin" size={18} /> : <Lock size={18} />}
+              {loading ? 'Gerando PIX...' : 'Liberar QR Code & Link Exclusivo (R$ 19,90)'}
+            </button>
           </div>
         </section>
 
-        {/* Lado Direito: QR Code Gerado (no topo) + Prévia no Telemóvel */}
+        {/* Lado Direito: QR Code Libertado + Prévia */}
         <section className="flex flex-col items-center justify-start space-y-6">
-          
-          {/* Card do QR Code no Canto Superior Direito */}
           {resultado && (
-            <div className="w-full max-w-[360px] bg-slate-900 border border-rose-500/40 p-5 rounded-2xl space-y-4 text-center shadow-2xl">
+            <div className="w-full max-w-[360px] bg-slate-900 border-2 border-emerald-500/60 p-5 rounded-2xl space-y-4 text-center shadow-2xl animate-fade-in">
+              <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-500/30">
+                <CheckCircle2 size={14} /> Pagamento Confirmado
+              </div>
+
               <h3 className="font-bold text-rose-400 text-lg flex items-center justify-center gap-2">
                 <Sparkles size={18} /> Seu QR Code está pronto!
               </h3>
@@ -219,12 +332,10 @@ export default function Home() {
             </div>
           )}
 
-          {/* Indicador da Prévia */}
           <div className="text-slate-400 text-sm flex items-center gap-2">
             <Clock size={16} /> Prévia da página em tempo real:
           </div>
 
-          {/* Moldura do Telemóvel com a Prévia */}
           <div className="w-full max-w-[360px] h-[680px] bg-slate-950 border-[8px] border-slate-800 rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col p-4 text-center text-white">
             <ChuvaDeCoracoes />
 
@@ -269,6 +380,75 @@ export default function Home() {
           </div>
         </section>
       </main>
+
+      {/* MODAL DE PAGAMENTO PIX MERCADO PAGO */}
+      {modalPixOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-rose-500/30 w-full max-w-md rounded-3xl p-6 text-center shadow-2xl relative space-y-5 animate-scale-up">
+            
+            <button
+              onClick={() => setModalPixOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            {pagamentoAprovado ? (
+              <div className="py-8 space-y-3">
+                <CheckCircle2 className="text-emerald-400 mx-auto animate-bounce" size={56} />
+                <h3 className="text-2xl font-bold text-white">Pagamento Confirmado!</h3>
+                <p className="text-slate-400 text-sm">Seu QR Code e link exclusivo foram liberados.</p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs px-3 py-1 rounded-full font-semibold">
+                    Pagamento Único via PIX
+                  </span>
+                  <h3 className="text-2xl font-bold text-white mt-3">Libere seu Presente</h3>
+                  <p className="text-slate-400 text-xs mt-1">Escaneie o PIX real do Mercado Pago no seu app do banco.</p>
+                  <div className="text-3xl font-extrabold text-rose-400 mt-2">R$ 19,90</div>
+                </div>
+
+                {/* QR Code Real Gerado pelo Mercado Pago */}
+                <div className="bg-white p-4 inline-block rounded-2xl shadow-inner border">
+                  {pixQrCodeBase64 ? (
+                    <img
+                      src={pixQrCodeBase64}
+                      alt="QR Code PIX Mercado Pago"
+                      className="w-44 h-44 mx-auto"
+                    />
+                  ) : (
+                    <div className="w-44 h-44 flex items-center justify-center text-slate-500 text-xs">
+                      Gerando QR Code...
+                    </div>
+                  )}
+                  <p className="text-slate-800 text-[10px] font-bold mt-2">Abra o app do seu banco e escaneie</p>
+                </div>
+
+                {/* Chave Copia e Cola Real */}
+                <div className="space-y-2">
+                  <button
+                    onClick={copiarPix}
+                    className="w-full bg-slate-950 border border-slate-700 hover:border-rose-500 p-2.5 rounded-xl text-xs text-slate-300 font-mono flex items-center justify-between transition group cursor-pointer"
+                  >
+                    <span className="truncate pr-2">{pixCopiaECola || 'Carregando chave PIX...'}</span>
+                    <span className="bg-rose-600 group-hover:bg-rose-500 text-white px-3 py-1 rounded text-[11px] font-sans font-medium shrink-0 flex items-center gap-1">
+                      {pixCopiado ? <Check size={12} /> : <Copy size={12} />}
+                      {pixCopiado ? 'Copiado!' : 'Copiar'}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 text-xs text-slate-400 pt-1">
+                  <Loader2 className="animate-spin text-rose-500" size={14} />
+                  <span>Aguardando pagamento em tempo real...</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
