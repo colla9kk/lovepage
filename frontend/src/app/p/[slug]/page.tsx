@@ -2,21 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { API_URL } from '@/lib/api';
 import { Heart, Sparkles } from 'lucide-react';
 
 function ChuvaDeCoracoes() {
-  const [coracoes, setCoracoes] = useState<Array<{ id: number; left: number; delay: number; duration: number; size: number }>>([]);
-
-  useEffect(() => {
-    const novosCoracoes = Array.from({ length: 30 }).map((_, i) => ({
-      id: i,
-      left: Math.random() * 92 + 4,
-      delay: Math.random() * 6,
-      duration: 4 + Math.random() * 5,
-      size: 14 + Math.random() * 18,
-    }));
-    setCoracoes(novosCoracoes);
-  }, []);
+  // Deterministic positions keep server rendering and hydration identical.
+  const coracoes = Array.from({ length: 25 }, (_, id) => ({
+    id, left: (id * 37 % 92) + 4, delay: (id * 17 % 60) / 10,
+    duration: 4 + (id * 13 % 50) / 10, size: 14 + (id * 7 % 16),
+  }));
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none z-10">
@@ -67,14 +61,14 @@ export default function PaginaCasal() {
   const params = useParams();
   const slug = params?.slug as string;
 
-  const [pagina, setPagina] = useState<any>(null);
+  const [pagina, setPagina] = useState<{ nomeCasal: string; dataInicio: string; mensagem: string; fotoUrl: string; spotifyTrackId?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState(false);
   const [tempo, setTempo] = useState({ dias: 0, horas: 0, minutos: 0, segundos: 0 });
 
   useEffect(() => {
     if (!slug) return;
-    fetch('http://localhost:5000/api/pages/' + slug)
+    fetch(`${API_URL}/api/pages/${encodeURIComponent(slug)}`)
       .then((res) => {
         if (!res.ok) throw new Error('Não encontrada');
         return res.json();

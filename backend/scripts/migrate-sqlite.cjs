@@ -1,0 +1,10 @@
+require('dotenv/config');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl?.startsWith('file:')) throw new Error('DATABASE_URL deve apontar para um arquivo SQLite.');
+const filename = path.resolve(__dirname, '../prisma', databaseUrl.slice(5).split('?')[0]);
+fs.mkdirSync(path.dirname(filename), { recursive: true });
+fs.closeSync(fs.openSync(filename, 'a'));
+execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], { stdio: 'inherit' });
