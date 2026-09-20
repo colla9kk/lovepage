@@ -1,120 +1,56 @@
-import express from "express";
-import cors from "cors";
-import { PrismaClient } from "@prisma/client";
-import QRCode from "qrcode";
-import { MercadoPagoConfig, Payment } from "mercadopago";
-
-const app = express();
+import 'dotenv/config';
+import { PrismaClient } from '@prisma/client';
+import { MercadoPagoConfig, Payment } from 'mercadopago';
+import { createApp } from './app';
+import { HttpError } from './checkout';
+function required(name: string) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`Configure ${name} no ambiente do backend.`);
+  return value;
+}
+const frontendUrl = new URL(required('FRONTEND_URL')).origin;
+if (process.env.NODE_ENV === 'production' && !frontendUrl.startsWith('https://')) throw new Error('FRONTEND_URL deve usar HTTPS em produção.');
 const prisma = new PrismaClient();
-
-// Access Token do Mercado Pago
-const client = new MercadoPagoConfig({
-  accessToken: "APP_USR-1410507370283496-091923-3827f4881021bd9a3f081cbce5d72380-3699720815",
-});
-
-const payment = new Payment(client);
-
-app.use(cors());
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
-
-// Rota 1: Criar cobrança PIX Real no Mercado Pago
-app.post("/api/checkout/pix", async (req, res) => {
-  try {
-    const { nomeCasal } = req.body;
-
-    const paymentData = await payment.create({
-      body: {
-        transaction_amount: 19.90,
-        description: `LovePage - Presente (${nomeCasal || "Casal"})`,
-        payment_method_id: "pix",
-        payer: {
-          email: "comprador@lovepage.com.br",
-          first_name: nomeCasal ? nomeCasal.split(" ")[0] : "Cliente",
-          last_name: "LovePage",
-          identification: {
-            type: "CPF",
-            number: "11144477735", // CPF com algoritmo Válido para aprovação da API do Mercado Pago
-          },
-        },
-      },
-    });
-
-    const qrCodeBase64 = paymentData.point_of_interaction?.transaction_data?.qr_code_base64;
-    const qrCodeCopiaCola = paymentData.point_of_interaction?.transaction_data?.qr_code;
-    const paymentId = paymentData.id;
-
-    res.json({
-      success: true,
-      paymentId,
-      qrCodeBase64: qrCodeBase64 ? `data:image/png;base64,${qrCodeBase64}` : null,
-      qrCodeCopiaCola,
-    });
-  } catch (error: any) {
-    console.error("Erro detalhado do Mercado Pago:", error);
-    const mensagemErro =
-      error?.cause?.[0]?.description || error?.message || "Falha ao comunicar com o Mercado Pago.";
-    res.status(500).json({ error: mensagemErro });
+const payment = new Payment(new MercadoPagoConfig({ accessToken: required('MERCADO_PAGO_ACCESS_TOKEN'), options: { timeout: 15000 } }));
+const webhookSecret = process.env.NODE_ENV === 'production' ? required('MERCADO_PAGO_WEBHOOK_SECRET') : process.env.MERCADO_PAGO_WEBHOOK_SECRET || '';
+const notificationUrl = process.env.MERCADO_PAGO_NOTIFICATION_URL;
+if (notificationUrl && new URL(notificationUrl).protocol !== 'https:') throw new Error('MERCADO_PAGO_NOTIFICATION_URL deve usar HTTPS.');
+const { app, checkout } = createApp(prisma, {
+  get: id => payment.get({ id }),
+  create: async order => {
+    try { return await payment.create({
+    requestOptions: { idempotencyKey: order.id },
+    body: {
+      transaction_amount: order.amountCents / 100,
+      description: 'LovePage - Presente romântico', payment_method_id: 'pix', external_reference: order.id,
+      ...(notificationUrl ? { notification_url: notificationUrl } : {}),
+      payer: { email: order.payerEmail, identification: { type: 'CPF', number: order.payerCpf } },
+    },
+  }); } catch (error) {
+    const status = typeof error === 'object' && error !== null && 'status' in error ? Number(error.status) : 0;
+    if ([400, 422].includes(status)) throw new HttpError(422, 'Dados recusados pelo provedor.');
+    throw error;
   }
-});
-
-// Rota 2: Verificar status do pagamento PIX
-app.get("/api/checkout/status/:paymentId", async (req, res) => {
+  },
+}, { frontendUrl, collectorId: required('MERCADO_PAGO_COLLECTOR_ID'), webhookSecret, trustProxy: Number(process.env.TRUST_PROXY_HOPS || 0) });
+let reconciling = false;
+const timer = setInterval(async () => {
+  if (reconciling) return;
+  reconciling = true;
   try {
-    const { paymentId } = req.params;
-    const paymentInfo = await payment.get({ id: paymentId });
-
-    res.json({
-      status: paymentInfo.status,
-      isApproved: paymentInfo.status === "approved",
+    const orders = await prisma.order.findMany({
+      where: { paymentId: { not: null }, page: null, status: { in: ['pending', 'in_process', 'authorized', 'approved'] } },
+      orderBy: { updatedAt: 'asc' }, take: 20,
     });
-  } catch (error) {
-    res.status(500).json({ error: "Erro ao verificar status do pagamento." });
-  }
+    for (const order of orders) {
+      try { await checkout.sync(order); } catch { console.error('Reconciliação será tentada novamente.'); }
+    }
+  } catch { console.error('Falha temporária na reconciliação.'); }
+  finally { reconciling = false; }
+}, 30000);
+timer.unref();
+const server = app.listen(Number(process.env.PORT || 5000), () => console.log('LovePage backend iniciado.'));
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
+  clearInterval(timer);
+  server.close(() => { void prisma.$disconnect().then(() => process.exit(0)); });
 });
-
-// Rota 3: Salvar a página do casal no banco
-app.post("/api/pages", async (req, res) => {
-  try {
-    const { nomeCasal, dataInicio, mensagem, fotoUrl, spotifyTrackId } = req.body;
-    const slugBase = nomeCasal
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "");
-
-    const slug = slugBase + "-" + Math.floor(1000 + Math.random() * 9000);
-
-    const novaPagina = await prisma.page.create({
-      data: { slug, nomeCasal, dataInicio, mensagem, fotoUrl, spotifyTrackId },
-    });
-
-    const urlPublica = "http://localhost:3000/p/" + novaPagina.slug;
-    const qrCodeDataUrl = await QRCode.toDataURL(urlPublica, {
-      width: 400,
-      margin: 2,
-      color: { dark: "#e11d48", light: "#ffffff" },
-    });
-
-    res.status(201).json({ success: true, slug: novaPagina.slug, url: urlPublica, qrCode: qrCodeDataUrl });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Erro ao guardar a pagina." });
-  }
-});
-
-// Rota 4: Buscar dados da página pública
-app.get("/api/pages/:slug", async (req, res) => {
-  try {
-    const { slug } = req.params;
-    const pagina = await prisma.page.findUnique({ where: { slug } });
-    if (!pagina) return res.status(404).json({ error: "Pagina nao encontrada." });
-    res.json(pagina);
-  } catch (error) {
-    res.status(500).json({ error: "Erro ao procurar a pagina." });
-  }
-});
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log("🚀 Backend rodando em http://localhost:" + PORT));
