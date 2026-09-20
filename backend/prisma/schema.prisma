@@ -8,11 +8,12 @@ datasource db {
 }
 
 model Page {
-  id         String   @id @default(uuid())
-  slug       String   @unique
-  nomeCasal  String
-  dataInicio String
-  mensagem   String
-  fotoUrl    String
-  createdAt  DateTime @default(now())
+  id             String   @id @default(uuid())
+  slug           String   @unique
+  nomeCasal      String
+  dataInicio     String
+  mensagem       String
+  fotoUrl        String
+  spotifyTrackId String?
+  createdAt      DateTime @default(now())
 }

@@ -4,6 +4,65 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Heart, Sparkles } from 'lucide-react';
 
+function ChuvaDeCoracoes() {
+  const [coracoes, setCoracoes] = useState<Array<{ id: number; left: number; delay: number; duration: number; size: number }>>([]);
+
+  useEffect(() => {
+    const novosCoracoes = Array.from({ length: 30 }).map((_, i) => ({
+      id: i,
+      left: Math.random() * 92 + 4,
+      delay: Math.random() * 6,
+      duration: 4 + Math.random() * 5,
+      size: 14 + Math.random() * 18,
+    }));
+    setCoracoes(novosCoracoes);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-10">
+      {coracoes.map((c) => (
+        <span
+          key={c.id}
+          className="absolute -top-8 select-none animate-cairEBalancar"
+          style={{
+            left: `${c.left}%`,
+            animationDelay: `${c.delay}s`,
+            animationDuration: `${c.duration}s`,
+            fontSize: `${c.size}px`,
+            filter: 'drop-shadow(0px 2px 4px rgba(225, 29, 72, 0.4))',
+          }}
+        >
+          ❤️
+        </span>
+      ))}
+      <style jsx>{`
+        @keyframes cairEBalancar {
+          0% {
+            transform: translateY(-20px) translateX(0px) rotate(0deg);
+            opacity: 0;
+          }
+          10% {
+            opacity: 0.9;
+          }
+          50% {
+            transform: translateY(50vh) translateX(20px) rotate(180deg);
+          }
+          90% {
+            opacity: 0.8;
+          }
+          100% {
+            transform: translateY(105vh) translateX(-20px) rotate(360deg);
+            opacity: 0;
+          }
+        }
+        .animate-cairEBalancar {
+          animation: cairEBalancar infinite linear;
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function PaginaCasal() {
   const params = useParams();
   const slug = params?.slug as string;
@@ -52,8 +111,10 @@ export default function PaginaCasal() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-        <p className="text-rose-400 font-medium animate-pulse">Carregando surpresa romântica...</p>
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
+        <p className="text-rose-400 font-medium animate-pulse text-lg flex items-center gap-2">
+          <Sparkles className="animate-spin" size={20} /> Carregando surpresa romântica...
+        </p>
       </div>
     );
   }
@@ -61,7 +122,7 @@ export default function PaginaCasal() {
   if (erro || !pagina) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center">
-        <Heart className="text-slate-700 mb-4" size={48} />
+        <Heart className="text-slate-700 mb-4" size={56} />
         <h1 className="text-2xl font-bold text-rose-400 mb-2">Página não encontrada</h1>
         <p className="text-slate-400">Esta página especial não existe ou o link está incorreto.</p>
       </div>
@@ -69,15 +130,32 @@ export default function PaginaCasal() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center shadow-2xl space-y-6 my-8">
-        <div className="relative w-48 h-48 mx-auto rounded-full overflow-hidden border-4 border-rose-500 shadow-xl shadow-rose-950">
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-x-hidden">
+      <ChuvaDeCoracoes />
+
+      <div className="w-full max-w-md bg-slate-900/90 backdrop-blur border border-slate-800 rounded-3xl p-6 text-center shadow-2xl space-y-6 my-8 relative z-20">
+        {pagina.spotifyTrackId && (
+          <div className="w-full rounded-2xl overflow-hidden shadow-md">
+            <iframe
+              src={`https://open.spotify.com/embed/track/${pagina.spotifyTrackId}?utm_source=generator&theme=0`}
+              width="100%"
+              height="80"
+              frameBorder="0"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+            ></iframe>
+          </div>
+        )}
+
+        <div className="relative w-52 h-64 mx-auto rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl">
           <img src={pagina.fotoUrl || 'https://via.placeholder.com/300'} alt="Casal" className="w-full h-full object-cover" />
         </div>
+
         <h1 className="text-3xl font-bold text-rose-400 flex items-center justify-center gap-2">
           <Sparkles className="text-amber-400" size={24} />
           {pagina.nomeCasal}
         </h1>
+
         <div className="bg-slate-950 border border-rose-500/20 rounded-2xl p-4 shadow-inner">
           <p className="text-xs uppercase tracking-wider text-slate-400 mb-3">Juntos Há</p>
           <div className="grid grid-cols-4 gap-2 text-center">
@@ -87,9 +165,11 @@ export default function PaginaCasal() {
             <div className="bg-slate-900 p-3 rounded-xl border border-slate-800"><span className="block text-2xl font-bold text-rose-400">{tempo.segundos}</span><span className="text-xs text-slate-400">Seg</span></div>
           </div>
         </div>
-        <div className="bg-slate-950/60 p-5 rounded-2xl border border-slate-800 text-slate-300 text-base whitespace-pre-line text-left leading-relaxed shadow-sm">
+
+        <div className="bg-slate-950/70 p-5 rounded-2xl border border-slate-800 text-slate-300 text-base whitespace-pre-line text-left leading-relaxed shadow-sm">
           {pagina.mensagem}
         </div>
+
         <div className="pt-2 flex justify-center text-rose-500">
           <Heart className="animate-pulse fill-rose-500" size={28} />
         </div>
