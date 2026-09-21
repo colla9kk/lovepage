@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { API_URL } from '@/lib/api';
 
 type Session = { orderId: string; token: string };
-type Draft = { nomeCasal: string; dataInicio: string; mensagem: string; fotoUrl: string; spotifyTrackId: string; email: string; cpf: string };
+type Draft = { nomeCasal: string; dataInicio: string; mensagem: string; fotoUrl: string; fotoUrls?: string[]; spotifyTrackId: string; email: string; cpf: string };
 type Checkout = { pageData: Omit<Draft, 'email' | 'cpf'>; status: string; result: { url: string; qrCode: string } | null; qrCodeBase64: string | null; qrCodeCopiaCola: string };
 const KEY = 'lovepage.checkout.v1';
 const terminal = new Set(['cancelled', 'rejected', 'refunded', 'charged_back']);
