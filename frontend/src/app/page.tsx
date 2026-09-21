@@ -410,10 +410,10 @@ export default function Home() {
             <Heart size={13} className="fill-rose-400" /> presente digital pronto em poucos minutos
           </span>
           <h1 className="mt-5 text-4xl md:text-6xl font-black tracking-tight text-white">
-            Transforme a história de vocês em uma página só do casal.
+            Um presente digital feito do jeito de quem vai receber.
           </h1>
           <p className="max-w-2xl mx-auto mt-4 text-slate-300 md:text-lg">
-            Fotos, música do Spotify, contador do relacionamento e uma carta especial em um link para enviar no WhatsApp.
+            Escolha entre Romântico, Amizade ou Família. Cada modelo muda a estrutura, os textos e a experiência da página.
           </p>
           <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-3">
             <a href="#criar" className="w-full sm:w-auto bg-rose-600 hover:bg-rose-500 text-white font-bold px-7 py-3.5 rounded-xl shadow-lg shadow-rose-950 transition">
