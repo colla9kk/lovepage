@@ -100,7 +100,7 @@ export default function Home() {
   const [promoAvailable, setPromoAvailable] = useState(false);
   const [promoChecking, setPromoChecking] = useState(false);
   const [promoMessage, setPromoMessage] = useState('');
-  const friendPromoHash = '88dd3a20441873e31490f500ebd0cc343ff96de22a5eb51ab6ad02d62489a45a';
+  const friendPromoHash = '18ff73a2155e1812d12502006edb91b563db904bda1f3f06a92e3c25423387f4';
   const effectivePriceCents = payment.checkout?.amountCents ?? (promoAvailable && promoAmountCents ? promoAmountCents : basePriceCents);
   const priceLabel = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(effectivePriceCents / 100);
   const [nomeCasalInput, setNomeCasal] = useState('Matheus & Marianne');
