@@ -691,81 +691,136 @@ export default function Home() {
             <Clock size={16} /> Prévia da página em tempo real:
           </div>
 
-          <div className={`w-full max-w-[360px] h-[680px] border-[8px] rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col p-4 text-center text-white ${themePreview.shell}`}>
-            <div className="absolute top-2 right-5 z-30 text-[9px] uppercase tracking-widest bg-black/40 border border-white/10 px-2 py-1 rounded-full text-slate-300">{themePreview.label}</div>
-            <ChuvaDeCoracoes />
+          <div className={`w-full max-w-[360px] h-[680px] border-[8px] rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col p-4 text-center text-white ${templateCopy.shell}`}>
+            <div className="absolute top-2 right-5 z-30 text-[9px] uppercase tracking-widest bg-black/40 border border-white/10 px-2 py-1 rounded-full text-slate-300">
+              {templateCopy.label}
+            </div>
+            {template === 'romantic' && <ChuvaDeCoracoes />}
 
-            <div className="relative z-20 flex flex-col h-full overflow-y-auto space-y-4 pr-1">
-              {spotifyEmbedTrackId && (
-                <div className="w-full rounded-xl overflow-hidden shrink-0 shadow-md">
-                  <iframe
-                    src={`https://open.spotify.com/embed/track/${spotifyEmbedTrackId}?utm_source=generator&theme=0`}
-                    width="100%"
-                    height="80"
-                    frameBorder="0"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy"
-                  ></iframe>
-                </div>
+            <div className="relative z-20 flex flex-col h-full overflow-y-auto space-y-4 pr-1 pt-5">
+              {template === 'romantic' && (
+                <>
+                  {spotifyEmbedTrackId && (
+                    <div className="w-full rounded-xl overflow-hidden shrink-0 shadow-md">
+                      <iframe
+                        src={`https://open.spotify.com/embed/track/${spotifyEmbedTrackId}?utm_source=generator&theme=0`}
+                        width="100%"
+                        height="80"
+                        frameBorder="0"
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                        loading="lazy"
+                      ></iframe>
+                    </div>
+                  )}
+
+                  <div className="space-y-2 shrink-0">
+                    <div className="relative w-52 h-64 mx-auto rounded-2xl overflow-hidden border-2 border-slate-800 shadow-2xl bg-slate-900">
+                      <img src={fotoPreview} alt="Prévia da foto" className="w-full h-full object-cover" />
+                      {fotoUrls.length > 1 && (
+                        <>
+                          <button type="button" onClick={() => setPreviewPhotoIndex(index => (index - 1 + fotoUrls.length) % fotoUrls.length)} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/75 flex items-center justify-center text-white" aria-label="Foto anterior">
+                            <ChevronLeft size={18} />
+                          </button>
+                          <button type="button" onClick={() => setPreviewPhotoIndex(index => (index + 1) % fotoUrls.length)} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/75 flex items-center justify-center text-white" aria-label="Próxima foto">
+                            <ChevronRight size={18} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <h2 className="text-2xl font-bold text-rose-400">{previewNomeCasal}</h2>
+
+                  <div className="bg-slate-900/90 border border-rose-500/20 rounded-xl p-3 shadow-inner">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Juntos há</p>
+                    <div className="grid grid-cols-4 gap-1.5 text-center">
+                      <div className="bg-slate-950 p-2 rounded-lg"><span className="block text-base font-bold text-rose-400">{tempo.dias}</span><span className="text-[9px] text-slate-400">Dias</span></div>
+                      <div className="bg-slate-950 p-2 rounded-lg"><span className="block text-base font-bold text-rose-400">{tempo.horas}</span><span className="text-[9px] text-slate-400">Horas</span></div>
+                      <div className="bg-slate-950 p-2 rounded-lg"><span className="block text-base font-bold text-rose-400">{tempo.minutos}</span><span className="text-[9px] text-slate-400">Min</span></div>
+                      <div className="bg-slate-950 p-2 rounded-lg"><span className="block text-base font-bold text-rose-400">{tempo.segundos}</span><span className="text-[9px] text-slate-400">Seg</span></div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 text-slate-300 text-xs whitespace-pre-line text-left leading-relaxed">
+                    {previewMensagem}
+                  </div>
+                </>
               )}
 
-              <div className="space-y-2 shrink-0">
-                <div className="relative w-52 h-64 mx-auto rounded-2xl overflow-hidden border-2 border-slate-800 shadow-2xl bg-slate-900">
-                  <img src={fotoPreview || 'https://via.placeholder.com/300'} alt={`Foto ${previewPhotoIndex + 1} do casal`} className="w-full h-full object-cover" />
-                  {fotoUrls.length > 1 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewPhotoIndex(index => (index - 1 + fotoUrls.length) % fotoUrls.length)}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/75 flex items-center justify-center text-white"
-                        aria-label="Foto anterior"
-                      >
-                        <ChevronLeft size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewPhotoIndex(index => (index + 1) % fotoUrls.length)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/75 flex items-center justify-center text-white"
-                        aria-label="Próxima foto"
-                      >
-                        <ChevronRight size={18} />
-                      </button>
-                    </>
-                  )}
-                </div>
-                {fotoUrls.length > 1 && (
-                  <div className="flex justify-center gap-1.5">
-                    {fotoUrls.map((_, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        onClick={() => setPreviewPhotoIndex(index)}
-                        className={`h-1.5 rounded-full transition-all ${index === previewPhotoIndex ? 'w-5 bg-rose-500' : 'w-1.5 bg-slate-600'}`}
-                        aria-label={`Ver foto ${index + 1}`}
-                      />
+              {template === 'friend' && (
+                <>
+                  <div className="text-left">
+                    <p className="text-[10px] tracking-[0.22em] text-cyan-400 uppercase font-bold">Para quem tá em todas 🤝</p>
+                    <h2 className="text-3xl font-black text-white mt-2 leading-tight">{previewNomeCasal}</h2>
+                    <p className="text-sm text-cyan-200 mt-1">{relationLabel || 'amizade que virou família'}</p>
+                  </div>
+
+                  <div className="relative mx-auto w-[82%] bg-white p-2 pb-8 shadow-2xl rotate-[-2deg] shrink-0">
+                    <img src={fotoPreview} alt="Prévia da amizade" className="w-full aspect-square object-cover" />
+                    <span className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-slate-700 font-medium">uma das nossas melhores memórias ✦</span>
+                  </div>
+
+                  <div className="grid gap-2 text-left">
+                    {(highlights.length ? highlights : ['Aquela resenha que só vocês entendem', 'Parceria nos dias bons e ruins', 'Histórias que merecem ser lembradas']).slice(0, 3).map((item, index) => (
+                      <div key={index} className="bg-cyan-400/10 border border-cyan-400/20 rounded-xl p-3 text-xs text-cyan-50">
+                        <span className="text-cyan-400 font-black mr-2">0{index + 1}</span>{item}
+                      </div>
                     ))}
                   </div>
-                )}
-              </div>
 
-              <h2 className={`text-2xl font-bold ${themePreview.accent}`}>{previewNomeCasal}</h2>
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-left">
+                    <p className="text-[10px] uppercase tracking-widest text-cyan-400 mb-2">pra você</p>
+                    <p className="text-sm text-slate-200 leading-relaxed">{previewMensagem}</p>
+                  </div>
 
-              <div className="bg-slate-900/90 border border-rose-500/20 rounded-xl p-3 shadow-inner">
-                <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Juntos Há</p>
-                <div className="grid grid-cols-4 gap-1.5 text-center">
-                  <div className="bg-slate-950 p-2 rounded-lg"><span className="block text-base font-bold text-rose-400">{tempo.dias}</span><span className="text-[9px] text-slate-400">Dias</span></div>
-                  <div className="bg-slate-950 p-2 rounded-lg"><span className="block text-base font-bold text-rose-400">{tempo.horas}</span><span className="text-[9px] text-slate-400">Horas</span></div>
-                  <div className="bg-slate-950 p-2 rounded-lg"><span className="block text-base font-bold text-rose-400">{tempo.minutos}</span><span className="text-[9px] text-slate-400">Min</span></div>
-                  <div className="bg-slate-950 p-2 rounded-lg"><span className="block text-base font-bold text-rose-400">{tempo.segundos}</span><span className="text-[9px] text-slate-400">Seg</span></div>
-                </div>
-              </div>
+                  {spotifyEmbedTrackId && (
+                    <div className="w-full rounded-xl overflow-hidden shrink-0">
+                      <iframe src={`https://open.spotify.com/embed/track/${spotifyEmbedTrackId}?utm_source=generator&theme=0`} width="100%" height="80" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+                    </div>
+                  )}
+                </>
+              )}
 
-              <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 text-slate-300 text-xs whitespace-pre-line text-left leading-relaxed">
-                {previewMensagem}
-              </div>
+              {template === 'family' && (
+                <>
+                  <div className="pt-4 pb-2">
+                    <div className="w-12 h-12 rounded-full bg-amber-300/15 border border-amber-300/30 flex items-center justify-center mx-auto text-2xl">🏡</div>
+                    <p className="text-[10px] tracking-[0.2em] text-amber-300 uppercase font-semibold mt-3">Uma homenagem com carinho</p>
+                    <h2 className="text-3xl font-serif font-bold text-amber-100 mt-2">{previewNomeCasal}</h2>
+                    {relationLabel && <p className="text-sm text-amber-200/70 mt-1">{relationLabel}</p>}
+                  </div>
 
-              <div className="pt-2 pb-4 flex justify-center text-rose-500/80 shrink-0">
-                <Heart className="animate-pulse fill-rose-500" size={22} />
+                  <div className="w-full aspect-[4/3] rounded-[28px] overflow-hidden border border-amber-200/20 shadow-2xl shrink-0">
+                    <img src={fotoPreview} alt="Prévia da homenagem" className="w-full h-full object-cover" />
+                  </div>
+
+                  {(highlights.length > 0) && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] uppercase tracking-widest text-amber-300">Coisas que guardo no coração</p>
+                      {highlights.slice(0, 3).map((item, index) => (
+                        <div key={index} className="bg-amber-100/5 border border-amber-100/15 rounded-xl px-4 py-3 text-left text-xs text-amber-50">
+                          ✦ {item}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="bg-[#241a0d] border border-amber-200/15 rounded-2xl p-5 text-left">
+                    <p className="font-serif text-sm text-amber-50 leading-relaxed">{previewMensagem}</p>
+                  </div>
+
+                  {spotifyEmbedTrackId && (
+                    <div className="w-full rounded-xl overflow-hidden shrink-0">
+                      <iframe src={`https://open.spotify.com/embed/track/${spotifyEmbedTrackId}?utm_source=generator&theme=0`} width="100%" height="80" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="pt-2 pb-4 flex justify-center shrink-0">
+                <span className={template === 'friend' ? 'text-cyan-300 text-lg' : template === 'family' ? 'text-amber-200 text-lg' : 'text-rose-500 text-lg'}>
+                  {template === 'friend' ? '✦ amizade boa é casa ✦' : template === 'family' ? 'com carinho, sempre ♡' : '♥'}
+                </span>
               </div>
             </div>
           </div>
