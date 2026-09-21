@@ -11,6 +11,7 @@ export type PaymentInfo = {
 export interface Gateway {
   create(order: Order): Promise<PaymentInfo>;
   get(id: string): Promise<PaymentInfo>;
+  cancel(id: string, idempotencyKey: string): Promise<PaymentInfo>;
 }
 export class HttpError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -95,5 +96,45 @@ export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: {
   async function get(id: string, token: string) {
     return sync(authorize(await prisma.order.findUnique({ where: { id } }), token));
   }
-  return { save, sync, get };
+
+  async function cancel(id: string, token: string) {
+    let order = authorize(await prisma.order.findUnique({ where: { id } }), token);
+    if (order.page || order.status === 'approved') throw new HttpError(409, 'Este pagamento já foi aprovado e o presente já está sendo entregue.');
+    if (['cancelled', 'rejected', 'refunded', 'charged_back'].includes(order.status)) {
+      return { orderId: order.id, status: order.status };
+    }
+
+    // If charge creation previously timed out, retry idempotently first so we can
+    // recover the provider payment id before trying to cancel it.
+    if (!order.paymentId) {
+      await sync(order);
+      order = authorize(await prisma.order.findUnique({ where: { id } }), token);
+      if (order.page || order.status === 'approved') throw new HttpError(409, 'Este pagamento já foi aprovado e não pode mais ser cancelado.');
+    }
+
+    if (order.paymentId) {
+      let info: PaymentInfo;
+      try {
+        info = await gateway.cancel(order.paymentId, `${order.id}:cancel`);
+      } catch (error) {
+        // The payment may have changed state between the last poll and the cancel request.
+        const current = await gateway.get(order.paymentId);
+        if (current.status === 'approved') {
+          await sync(order);
+          throw new HttpError(409, 'O pagamento foi aprovado antes do cancelamento.');
+        }
+        throw error;
+      }
+      verify(order, info);
+      if (!['cancelled', 'canceled'].includes(info.status || '')) throw new HttpError(502, 'O provedor não confirmou o cancelamento do PIX.');
+    }
+
+    const cancelled = await prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'cancelled', payerCpf: '', payerEmail: '' },
+    });
+    return { orderId: cancelled.id, status: cancelled.status };
+  }
+
+  return { save, sync, get, cancel };
 }
