@@ -102,6 +102,7 @@ export function useCheckout() {
       }
       setSession(next);
       setCheckout(data);
+      return true;
     } catch (cause) {
       if (shouldRecover && localStorage.getItem(KEY)) {
         // If the network/provider timed out after accepting the request, keep the
@@ -109,6 +110,7 @@ export function useCheckout() {
         setSession(current => current ?? next);
       }
       setError(cause instanceof Error ? cause.message : 'Não foi possível iniciar o pagamento.');
+      return false;
     }
     finally { busy.current = false; setLoading(false); }
   }
