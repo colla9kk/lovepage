@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useCheckout } from '@/hooks/useCheckout';
-import { Heart, Image as ImageIcon, Calendar, Sparkles, Clock, Copy, Check, Download, Music, Upload, CreditCard, Lock, CheckCircle2, X, Loader2, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { trackMetric } from '@/lib/metrics';
+import { Heart, Image as ImageIcon, Calendar, Sparkles, Clock, Copy, Check, Download, Music, Upload, CreditCard, Lock, CheckCircle2, X, Loader2, ChevronLeft, ChevronRight, Trash2, MessageCircle, Palette } from 'lucide-react';
 
 function ChuvaDeCoracoes() {
   // Deterministic positions keep server rendering and hydration identical.
@@ -75,6 +76,14 @@ function spotifyTrackIdFromInput(value: string) {
   }
 }
 
+function formatCpf(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  return digits
+    .replace(/^(\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1-$2');
+}
+
 async function compressPhoto(file: File): Promise<string> {
   const source = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -120,12 +129,14 @@ export default function Home() {
   const friendPromoHash = '18ff73a2155e1812d12502006edb91b563db904bda1f3f06a92e3c25423387f4';
   const effectivePriceCents = payment.checkout?.amountCents ?? (promoAvailable && promoAmountCents ? promoAmountCents : basePriceCents);
   const priceLabel = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(effectivePriceCents / 100);
-  const [nomeCasalInput, setNomeCasal] = useState('Matheus & Marianne');
-  const [dataInicioInput, setDataInicio] = useState('2024-01-01');
-  const [mensagemInput, setMensagem] = useState('Cada segundo ao seu lado é um presente inesquecível. Te amo!');
-  const [fotoUrlsInput, setFotoUrls] = useState<string[]>([DEFAULT_PHOTO]);
+  const [nomeCasalInput, setNomeCasal] = useState('');
+  const [dataInicioInput, setDataInicio] = useState('');
+  const [mensagemInput, setMensagem] = useState('');
+  const [fotoUrlsInput, setFotoUrls] = useState<string[]>([]);
   const [previewPhotoIndex, setPreviewPhotoIndex] = useState(0);
-  const [spotifyTrackIdInput, setSpotifyTrackId] = useState('https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT');
+  const [spotifyTrackIdInput, setSpotifyTrackId] = useState('');
+  const [themeInput, setThemeInput] = useState<'romantic' | 'midnight' | 'minimal'>('romantic');
+  const [formError, setFormError] = useState('');
 
   const [tempo, setTempo] = useState({ dias: 0, horas: 0, minutos: 0, segundos: 0 });
   const [email, setEmail] = useState('');
@@ -148,9 +159,20 @@ export default function Home() {
       ? [payment.checkout.pageData.fotoUrl]
       : fotoUrlsInput;
   const fotoUrl = fotoUrls[0] || DEFAULT_PHOTO;
-  const fotoPreview = fotoUrls[Math.min(previewPhotoIndex, fotoUrls.length - 1)] || fotoUrl;
+  const fotoPreview = fotoUrls[Math.min(previewPhotoIndex, Math.max(0, fotoUrls.length - 1))] || fotoUrl;
   const spotifyTrackId = payment.checkout?.pageData?.spotifyTrackId ?? spotifyTrackIdInput;
   const spotifyEmbedTrackId = spotifyTrackIdFromInput(spotifyTrackId);
+  const theme = payment.checkout?.pageData?.theme ?? themeInput;
+  const previewNomeCasal = nomeCasal || 'Seu Amor & Você';
+  const previewMensagem = mensagem || 'Sua mensagem especial vai aparecer aqui...';
+
+  useEffect(() => {
+    const key = 'lovepage.metric.landing_view';
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1');
+      trackMetric('landing_view');
+    }
+  }, []);
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('promo')?.trim() || '';
@@ -210,7 +232,7 @@ export default function Home() {
     e.target.value = '';
     if (!files.length) return;
 
-    const currentCount = fotoUrlsInput.length === 1 && fotoUrlsInput[0] === DEFAULT_PHOTO ? 0 : fotoUrlsInput.length;
+    const currentCount = fotoUrlsInput.length;
     if (currentCount + files.length > 10) {
       alert(`Você pode usar até 10 fotos. Ainda cabem ${Math.max(0, 10 - currentCount)}.`);
       return;
@@ -226,10 +248,7 @@ export default function Home() {
 
     try {
       const compressed = await Promise.all(files.map(compressPhoto));
-      setFotoUrls(previous => {
-        const base = previous.length === 1 && previous[0] === DEFAULT_PHOTO ? [] : previous;
-        return [...base, ...compressed].slice(0, 10);
-      });
+      setFotoUrls(previous => [...previous, ...compressed].slice(0, 10));
       setPreviewPhotoIndex(currentCount);
     } catch (cause) {
       alert(cause instanceof Error ? cause.message : 'Não foi possível preparar as fotos.');
@@ -238,13 +257,28 @@ export default function Home() {
 
   const removerFoto = (index: number) => {
     setFotoUrls(previous => {
-      const next = previous.filter((_, photoIndex) => photoIndex !== index);
-      return next.length ? next : [DEFAULT_PHOTO];
+      return previous.filter((_, photoIndex) => photoIndex !== index);
     });
     setPreviewPhotoIndex(0);
   };
 
   const iniciarCheckout = async () => {
+    if (!payment.session) {
+      const cpfDigits = cpf.replace(/\D/g, '');
+      if (!nomeCasal.trim()) { setFormError('Coloque o nome do casal.'); return; }
+      if (!dataInicio) { setFormError('Escolha a data de início do casal.'); return; }
+      if (!mensagem.trim()) { setFormError('Escreva uma mensagem para a pessoa.'); return; }
+      if (!fotoUrlsInput.length) { setFormError('Adicione pelo menos uma foto do casal.'); return; }
+      if (spotifyTrackIdInput.trim() && !spotifyTrackIdFromInput(spotifyTrackIdInput)) {
+        setFormError('Cole um link válido de uma música do Spotify.');
+        return;
+      }
+      if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setFormError('Coloque um e-mail válido.'); return; }
+      if (cpfDigits.length !== 11) { setFormError('Confira o CPF antes de gerar o PIX.'); return; }
+      setFormError('');
+      trackMetric('checkout_click');
+    }
+
     setModalPixOpen(true);
     if (!payment.session) await payment.start({
       nomeCasal,
@@ -253,6 +287,7 @@ export default function Home() {
       fotoUrl,
       fotoUrls,
       spotifyTrackId,
+      theme,
       email,
       cpf,
       ...(promoAvailable && promoCode ? { promoCode } : {}),
@@ -265,6 +300,13 @@ export default function Home() {
       setPixCopiado(true);
       setTimeout(() => setPixCopiado(false), 2500);
     }
+  };
+
+  const compartilharResultado = () => {
+    if (!resultado) return;
+    trackMetric('whatsapp_share', { orderId: payment.session?.orderId });
+    const texto = `💖 Fiz uma surpresa especial para você: ${previewNomeCasal}\n${resultado.url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank', 'noopener,noreferrer');
   };
 
   const copiarLink = async () => {
@@ -287,6 +329,7 @@ export default function Home() {
     setFotoUrls(fotoUrls);
     setPreviewPhotoIndex(0);
     setSpotifyTrackId(spotifyTrackId);
+    setThemeInput(theme);
 
     const cancelled = await payment.cancelPending();
     if (cancelled) {
