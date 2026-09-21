@@ -10,6 +10,24 @@ export function validCpf(value: string) {
   return true;
 }
 
+function spotifyTrackId(value: string) {
+  const input = value.trim();
+  if (!input) return '';
+  if (/^[A-Za-z0-9]{22}$/.test(input)) return input;
+
+  const uri = /^spotify:track:([A-Za-z0-9]{22})$/.exec(input);
+  if (uri) return uri[1];
+
+  try {
+    const url = new URL(input);
+    if (!['open.spotify.com', 'www.open.spotify.com'].includes(url.hostname.toLowerCase())) return null;
+    const match = /^\/track\/([A-Za-z0-9]{22})\/?$/.exec(url.pathname);
+    return match?.[1] || null;
+  } catch {
+    return null;
+  }
+}
+
 const photo = z.string().max(7 * 1024 * 1024).refine(value => {
   if (value.startsWith('data:')) {
     const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
@@ -27,7 +45,9 @@ export const pageInput = z.object({
   mensagem: z.string().trim().min(1).max(10000),
   fotoUrl: photo,
   fotoUrls: z.array(photo).min(1).max(10, 'Envie no máximo 10 fotos.').optional(),
-  spotifyTrackId: z.string().trim().regex(/^$|^[a-zA-Z0-9]{22}$/).optional().default(''),
+  spotifyTrackId: z.string().trim().max(2048).optional().default('')
+    .refine(value => spotifyTrackId(value) !== null, 'Cole um link válido de uma música do Spotify.')
+    .transform(value => spotifyTrackId(value) || ''),
 });
 export const checkoutInput = pageInput.extend({
   orderId: z.string().uuid(),
