@@ -16,7 +16,11 @@ type Dashboard = {
   };
   metrics30d: {
     landingViews: number;
+    templateSelections: number;
+    customizationComplete: number;
+    paymentStepOpens: number;
     checkoutClicks: number;
+    pixCreated: number;
     pageViews: number;
     whatsappShares: number;
   };
@@ -154,13 +158,27 @@ export default function AdminPage() {
         </section>
 
         <section className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4"><BarChart3 size={18} className="text-rose-400" /><h2 className="font-bold">Últimos 30 dias</h2></div>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-center">
-            <div className="bg-slate-950 rounded-xl p-4"><b className="text-xl">{dashboard.metrics30d.landingViews}</b><span className="block text-xs text-slate-500 mt-1">visitas</span></div>
-            <div className="bg-slate-950 rounded-xl p-4"><b className="text-xl">{dashboard.metrics30d.checkoutClicks}</b><span className="block text-xs text-slate-500 mt-1">cliques no PIX</span></div>
-            <div className="bg-slate-950 rounded-xl p-4"><b className="text-xl">{dashboard.metrics30d.pageViews}</b><span className="block text-xs text-slate-500 mt-1">presentes abertos</span></div>
-            <div className="bg-slate-950 rounded-xl p-4"><b className="text-xl">{dashboard.metrics30d.whatsappShares}</b><span className="block text-xs text-slate-500 mt-1">shares WhatsApp</span></div>
-            <div className="bg-slate-950 rounded-xl p-4"><b className="text-xl">{conversion}%</b><span className="block text-xs text-slate-500 mt-1">visita → pago*</span></div>
+          <div className="flex items-center gap-2 mb-4"><BarChart3 size={18} className="text-rose-400" /><h2 className="font-bold">Funil dos últimos 30 dias</h2></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+            {[
+              ['Visitas', dashboard.metrics30d.landingViews],
+              ['Escolheu modelo', dashboard.metrics30d.templateSelections],
+              ['Terminou personalização', dashboard.metrics30d.customizationComplete],
+              ['Abriu pagamento', dashboard.metrics30d.paymentStepOpens],
+              ['Enviou dados do PIX', dashboard.metrics30d.checkoutClicks],
+              ['PIX criado', dashboard.metrics30d.pixCreated],
+              ['Presentes abertos', dashboard.metrics30d.pageViews],
+              ['Shares WhatsApp', dashboard.metrics30d.whatsappShares],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="bg-slate-950 rounded-xl p-4">
+                <b className="text-xl">{String(value)}</b>
+                <span className="block text-xs text-slate-500 mt-1">{String(label)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 rounded-xl bg-slate-950 p-4 flex items-center justify-between gap-4">
+            <span className="text-sm text-slate-400">Conversão visita → pago*</span>
+            <b className="text-xl">{conversion}%</b>
           </div>
           <p className="text-[11px] text-slate-600 mt-3">* Conversão usa eventos registrados a partir da ativação das métricas.</p>
         </section>
