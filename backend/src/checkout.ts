@@ -19,7 +19,7 @@ export class HttpError extends Error {
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
 const ONE_TIME_PROMOS = new Map<string, number>([
-  ['88dd3a20441873e31490f500ebd0cc343ff96de22a5eb51ab6ad02d62489a45a', 1000],
+  ['18ff73a2155e1812d12502006edb91b563db904bda1f3f06a92e3c25423387f4', 1000],
 ]);
 
 function promotionFromCode(code?: string) {
