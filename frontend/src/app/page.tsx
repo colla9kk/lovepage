@@ -141,6 +141,25 @@ export default function Home() {
     }
   };
 
+  const corrigirPedido = async () => {
+    if (!payment.session) return;
+    const confirmed = window.confirm('Cancelar este PIX e voltar para editar? O QR Code atual deixará de valer e você poderá gerar um novo pedido.');
+    if (!confirmed) return;
+
+    // Preserve the public gift fields even if this session was restored after a reload.
+    setNomeCasal(nomeCasal);
+    setDataInicio(dataInicio);
+    setMensagem(mensagem);
+    setFotoUrl(fotoUrl);
+    setSpotifyTrackId(spotifyTrackId);
+
+    const cancelled = await payment.cancelPending();
+    if (cancelled) {
+      setModalPixOpen(false);
+      alert('PIX anterior cancelado. Corrija os dados e gere um novo pedido.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans relative">
       <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur p-4 flex justify-between items-center px-6">
@@ -235,6 +254,16 @@ export default function Home() {
             </div>
           </fieldset>
           {payment.session && <p className="text-sm text-slate-300">Seu pedido está salvo. Use este navegador para acompanhar a compra. A página usará os dados enviados ao gerar o PIX.</p>}
+          {payment.session && !resultado && !payment.terminal && (
+            <button
+              type="button"
+              onClick={corrigirPedido}
+              disabled={loading}
+              className="w-full border border-slate-700 hover:border-rose-500 text-slate-200 hover:text-white py-2.5 rounded-xl transition disabled:opacity-50"
+            >
+              Corrigir dados / gerar novo PIX
+            </button>
+          )}
           {payment.error && <p role="alert" className="text-sm text-amber-300">{payment.error}</p>}
           {(resultado || payment.terminal) && <button onClick={payment.reset} className="text-rose-300 underline">Criar outro presente</button>}
             <button
@@ -404,6 +433,17 @@ export default function Home() {
                   <Loader2 className="animate-spin text-rose-500" size={14} />
                   <span>{payment.checkout?.status === 'approved' ? 'Pagamento recebido. Preparando seu presente...' : payment.session ? 'Acompanhando seu pedido automaticamente...' : 'Confira os dados do formulário para continuar.'}</span>
                 </div>
+
+                {payment.session && (
+                  <button
+                    type="button"
+                    onClick={corrigirPedido}
+                    disabled={loading}
+                    className="w-full border border-slate-700 hover:border-rose-500 text-slate-300 hover:text-white py-2.5 rounded-xl text-sm transition disabled:opacity-50"
+                  >
+                    Corrigir dados / gerar novo PIX
+                  </button>
+                )}
               </>
             )}
           </div>
