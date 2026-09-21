@@ -135,7 +135,9 @@ export default function Home() {
   const [fotoUrlsInput, setFotoUrls] = useState<string[]>([]);
   const [previewPhotoIndex, setPreviewPhotoIndex] = useState(0);
   const [spotifyTrackIdInput, setSpotifyTrackId] = useState('');
-  const [themeInput, setThemeInput] = useState<'romantic' | 'midnight' | 'minimal'>('romantic');
+  const [themeInput, setThemeInput] = useState<'romantic' | 'friend' | 'family'>('romantic');
+  const [relationLabelInput, setRelationLabel] = useState('');
+  const [highlightsInput, setHighlights] = useState<string[]>(['', '', '']);
   const [formError, setFormError] = useState('');
 
   const [tempo, setTempo] = useState({ dias: 0, horas: 0, minutos: 0, segundos: 0 });
@@ -163,13 +165,47 @@ export default function Home() {
   const spotifyTrackId = payment.checkout?.pageData?.spotifyTrackId ?? spotifyTrackIdInput;
   const spotifyEmbedTrackId = spotifyTrackIdFromInput(spotifyTrackId);
   const theme = payment.checkout?.pageData?.theme ?? themeInput;
-  const previewNomeCasal = nomeCasal || 'Seu Amor & Você';
+  const template = theme === 'friend' || theme === 'family' ? theme : 'romantic';
+  const relationLabel = payment.checkout?.pageData?.relationLabel ?? relationLabelInput;
+  const checkoutHighlights = payment.checkout?.pageData?.highlights;
+  const highlights = checkoutHighlights?.length ? checkoutHighlights : highlightsInput.filter(item => item.trim());
+  const templateCopy = {
+    romantic: {
+      label: 'Romântico',
+      nameLabel: 'Nome do casal',
+      dateLabel: 'Data do início',
+      albumLabel: 'Álbum do casal',
+      messageLabel: 'Carta / mensagem romântica',
+      namePlaceholder: 'Ex: Matheus & Marianne',
+      previewName: 'Seu Amor & Você',
+      shell: 'bg-slate-950 border-slate-800',
+      accent: 'text-rose-400',
+    },
+    friend: {
+      label: 'Melhor amigo(a)',
+      nameLabel: 'Nome do seu amigo(a)',
+      dateLabel: 'Desde quando vocês se conhecem? (opcional)',
+      albumLabel: 'Fotos das melhores memórias',
+      messageLabel: 'Mensagem para seu amigo(a)',
+      namePlaceholder: 'Ex: Wendel',
+      previewName: 'Seu melhor amigo',
+      shell: 'bg-[#071827] border-cyan-900/60',
+      accent: 'text-cyan-300',
+    },
+    family: {
+      label: 'Família',
+      nameLabel: 'Nome da pessoa',
+      dateLabel: 'Uma data especial (opcional)',
+      albumLabel: 'Fotos em família',
+      messageLabel: 'Mensagem de carinho e gratidão',
+      namePlaceholder: 'Ex: Mãe',
+      previewName: 'Alguém muito especial',
+      shell: 'bg-[#171108] border-amber-900/60',
+      accent: 'text-amber-200',
+    },
+  }[template];
+  const previewNomeCasal = nomeCasal || templateCopy.previewName;
   const previewMensagem = mensagem || 'Sua mensagem especial vai aparecer aqui...';
-  const themePreview = {
-    romantic: { shell: 'bg-slate-950 border-slate-800', accent: 'text-rose-400', label: 'Romântico' },
-    midnight: { shell: 'bg-zinc-950 border-violet-900/60', accent: 'text-violet-300', label: 'Midnight' },
-    minimal: { shell: 'bg-slate-950 border-slate-600', accent: 'text-slate-100', label: 'Minimal' },
-  }[theme];
 
   useEffect(() => {
     const key = 'lovepage.metric.landing_view';
