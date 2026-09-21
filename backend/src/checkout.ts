@@ -113,6 +113,10 @@ export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: {
               fotoUrl: photos.length === 1 ? photos[0] : JSON.stringify(photos),
               spotifyTrackId: payload.spotifyTrackId,
               theme: payload.theme,
+              extraData: JSON.stringify({
+                relationLabel: payload.relationLabel,
+                highlights: payload.highlights,
+              }),
               orderId: order.id,
               slug: `${base}-${randomUUID()}`,
             },
