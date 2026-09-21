@@ -48,6 +48,7 @@ export const pageInput = z.object({
   spotifyTrackId: z.string().trim().max(2048).optional().default('')
     .refine(value => spotifyTrackId(value) !== null, 'Cole um link válido de uma música do Spotify.')
     .transform(value => spotifyTrackId(value) || ''),
+  theme: z.enum(['romantic', 'midnight', 'minimal']).optional().default('romantic'),
 });
 export const checkoutInput = pageInput.extend({
   orderId: z.string().uuid(),
