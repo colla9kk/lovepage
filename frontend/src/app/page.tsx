@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useCheckout } from '@/hooks/useCheckout';
-import { API_URL } from '@/lib/api';
 import { Heart, Image as ImageIcon, Calendar, Sparkles, Clock, Copy, Check, Download, Music, Upload, CreditCard, Lock, CheckCircle2, X, Loader2, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 function ChuvaDeCoracoes() {
@@ -101,6 +100,7 @@ export default function Home() {
   const [promoAvailable, setPromoAvailable] = useState(false);
   const [promoChecking, setPromoChecking] = useState(false);
   const [promoMessage, setPromoMessage] = useState('');
+  const friendPromoHash = '88dd3a20441873e31490f500ebd0cc343ff96de22a5eb51ab6ad02d62489a45a';
   const effectivePriceCents = payment.checkout?.amountCents ?? (promoAvailable && promoAmountCents ? promoAmountCents : basePriceCents);
   const priceLabel = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(effectivePriceCents / 100);
   const [nomeCasalInput, setNomeCasal] = useState('Matheus & Marianne');
@@ -144,28 +144,19 @@ export default function Home() {
       setPromoAmountCents(null);
       setPromoAvailable(false);
       setPromoMessage('');
+      setPromoChecking(false);
       return;
     }
     let stopped = false;
-    const controller = new AbortController();
     setPromoChecking(true);
-    const query = payment.session ? `?orderId=${encodeURIComponent(payment.session.orderId)}` : '';
-    fetch(`${API_URL}/api/promos/${encodeURIComponent(promoCode)}${query}`, {
-      signal: controller.signal,
-      cache: 'no-store',
-    })
-      .then(async res => ({ res, data: await res.json().catch(() => ({})) }))
-      .then(({ res, data }) => {
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(promoCode))
+      .then(buffer => Array.from(new Uint8Array(buffer), byte => byte.toString(16).padStart(2, '0')).join(''))
+      .then(hash => {
         if (stopped) return;
-        if (!res.ok || !data.valid) {
-          setPromoAmountCents(null);
-          setPromoAvailable(false);
-          setPromoMessage('Este link promocional não é válido.');
-          return;
-        }
-        setPromoAmountCents(Number(data.amountCents));
-        setPromoAvailable(Boolean(data.available));
-        setPromoMessage(data.available ? 'Preço especial liberado para este link.' : 'Esta promoção de uso único já foi utilizada.');
+        const valid = hash === friendPromoHash;
+        setPromoAmountCents(valid ? 1000 : null);
+        setPromoAvailable(valid);
+        setPromoMessage(valid ? 'Preço especial liberado para este link.' : 'Este link promocional não é válido.');
       })
       .catch(() => {
         if (!stopped) {
@@ -175,8 +166,8 @@ export default function Home() {
         }
       })
       .finally(() => { if (!stopped) setPromoChecking(false); });
-    return () => { stopped = true; controller.abort(); };
-  }, [promoCode, payment.ready, payment.session?.orderId]);
+    return () => { stopped = true; };
+  }, [promoCode, payment.ready]);
 
   useEffect(() => {
     const calcularTempo = () => {
