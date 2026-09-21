@@ -75,9 +75,30 @@ export function useCheckout() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível iniciar o pagamento.'); }
     finally { busy.current = false; setLoading(false); }
   }
+  async function cancelPending() {
+    if (busy.current || !session || checkout?.result || terminal.has(checkout?.status || '')) return false;
+    busy.current = true; setLoading(true); setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/checkout/orders/${session.orderId}/cancel`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.token}` },
+        signal: AbortSignal.timeout(20000),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Não foi possível cancelar o PIX anterior.');
+      localStorage.removeItem(KEY); setSession(null); setCheckout(null); setError('');
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível cancelar o PIX anterior.');
+      return false;
+    } finally {
+      busy.current = false; setLoading(false);
+    }
+  }
+
   function reset() {
     if (!checkout?.result && !terminal.has(checkout?.status || '')) return;
     localStorage.removeItem(KEY); setSession(null); setCheckout(null); setError('');
   }
-  return { start, reset, session, checkout, ready, loading, error, terminal: terminal.has(checkout?.status || '') };
+  return { start, cancelPending, reset, session, checkout, ready, loading, error, terminal: terminal.has(checkout?.status || '') };
 }
