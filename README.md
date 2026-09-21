@@ -48,15 +48,17 @@ Abra `http://localhost:3000`.
 | Backend | `MERCADO_PAGO_NOTIFICATION_URL` | `https://seu-backend/api/webhooks/mercadopago`; configure também os eventos de pagamento no painel |
 | Backend | `FRONTEND_URL` | Origem pública do frontend; HTTPS em produção; usada no CORS e QR Code |
 | Backend | `PORT` | Porta HTTP, padrão 5000 |
+| Backend | `PRICE_CENTS` | Preço do PIX em centavos; padrão `1990` |
 | Backend | `TRUST_PROXY_HOPS` | Quantidade exata de proxies confiáveis entre cliente e backend; 0 no acesso direto |
 | Frontend | `NEXT_PUBLIC_API_URL` | Origem do backend; precisa estar definida **antes do build** |
+| Frontend | `NEXT_PUBLIC_PRICE_CENTS` | Preço exibido no frontend em centavos; mantenha igual a `PRICE_CENTS` |
 
 Não há modo de aprovação falsa no servidor de produção. Os testes injetam um gateway simulado somente no processo de teste. O formulário coleta e-mail e CPF do comprador; não usa dados fictícios para contornar recusas do provedor. A validação dos dígitos do CPF não verifica titularidade.
 
 ## Fluxo e recuperação
 
 1. O navegador gera um UUID de pedido e uma chave aleatória de recuperação, salva somente esses dois valores no armazenamento local e envia o formulário ao backend.
-2. O backend valida o conteúdo e persiste pedido, dados do presente e hash da chave **antes** de solicitar a cobrança. O valor de 1990 centavos é definido no servidor.
+2. O backend valida o conteúdo e persiste pedido, dados do presente e hash da chave **antes** de solicitar a cobrança. O valor é definido no servidor por `PRICE_CENTS` (padrão `1990` centavos) e gravado no pedido.
 3. A criação no Mercado Pago usa o UUID persistido como chave de idempotência. Repetir uma requisição recupera a mesma cobrança; os dados do pedido já criado não mudam.
 4. A consulta autenticada ao pedido verifica pagamento, valor, moeda BRL, recebedor, método PIX e referência do pedido. A página possui vínculo único com o pedido.
 5. A interface só anuncia entrega quando recebe a URL e o QR Code de uma página salva. Falhas temporárias são tentadas novamente, sem criar outra cobrança.
@@ -85,7 +87,7 @@ npm --prefix frontend run lint
 npm --prefix frontend run build
 ```
 
-Defina `NEXT_PUBLIC_API_URL` para o build do frontend. Os testes usam SQLite temporário e não cobram dinheiro. Cobrem publicação sem pagamento, acesso com chave incorreta, duplicidade, dados financeiros divergentes, timeout após emissão, falha de gravação após aprovação, cancelamento, webhook e validação de entrada. O CI também prepara banco PostgreSQL e verifica migrations e build.
+Defina `NEXT_PUBLIC_API_URL` para o build do frontend. Para alterar o preço exibido, defina `NEXT_PUBLIC_PRICE_CENTS` com o mesmo valor de `PRICE_CENTS`. Os testes usam SQLite temporário e não cobram dinheiro. Cobrem publicação sem pagamento, acesso com chave incorreta, duplicidade, dados financeiros divergentes, timeout após emissão, falha de gravação após aprovação, cancelamento, webhook e validação de entrada. O CI também prepara banco PostgreSQL e verifica migrations e build.
 
 ## Publicação
 
