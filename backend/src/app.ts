@@ -36,6 +36,18 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: { fron
     if (!page) { res.status(404).json({ error: 'Página não encontrada.' }); return; }
     res.json(page);
   });
+  app.get('/api/pages/:slug/photo', async (req, res) => {
+    const page = await prisma.page.findUnique({ where: { slug: req.params.slug }, select: { fotoUrl: true } });
+    if (!page) { res.status(404).end(); return; }
+
+    const dataImage = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(page.fotoUrl);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    if (dataImage) {
+      res.type(dataImage[1]).send(Buffer.from(dataImage[2], 'base64'));
+      return;
+    }
+    res.redirect(302, page.fotoUrl);
+  });
   app.post('/api/webhooks/mercadopago', async (req, res) => {
     const id = typeof req.query['data.id'] === 'string' ? req.query['data.id'] : '';
     if (!config.webhookSecret || !validSignature(config.webhookSecret, req.get('x-signature') || '', req.get('x-request-id') || '', id)) {
