@@ -26,13 +26,6 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: { fron
     }
   };
   app.get('/health', async (_req, res) => { await prisma.$queryRaw`SELECT 1`; res.json({ ok: true }); });
-  app.get('/api/promos/:code', rateLimit({ windowMs: 60000, limit: 30 }), async (req, res) => {
-    const orderId = typeof req.query.orderId === 'string' ? req.query.orderId : undefined;
-    const promo = await checkout.promoInfo(req.params.code, orderId);
-    if (!promo) { res.status(404).json({ valid: false, available: false }); return; }
-    res.json(promo);
-  });
-
   app.post('/api/checkout/pix', rateLimit({ windowMs: 60000, limit: config.checkoutLimit ?? 10 }), async (req, res) => {
     const order = await checkout.save(checkoutInput.parse(req.body), token(req));
     res.json({ success: true, ...await checkout.sync(order) });
