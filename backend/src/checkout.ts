@@ -17,6 +17,18 @@ export class HttpError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
+
+const ONE_TIME_PROMOS = new Map<string, number>([
+  ['88dd3a20441873e31490f500ebd0cc343ff96de22a5eb51ab6ad02d62489a45a', 1000],
+]);
+
+function promotionFromCode(code?: string) {
+  if (!code) return null;
+  const hash = hashToken(code);
+  const amountCents = ONE_TIME_PROMOS.get(hash);
+  return amountCents ? { hash, amountCents } : null;
+}
+
 export function authorize(order: Order | null, token: string) {
   if (!order || !/^[a-f0-9]{64}$/.test(token) || !timingSafeEqual(Buffer.from(order.tokenHash, 'hex'), Buffer.from(hashToken(token), 'hex'))) {
     throw new HttpError(404, 'Pedido não encontrado.');
@@ -29,14 +41,30 @@ export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: {
     if (!/^[a-f0-9]{64}$/.test(token)) throw new HttpError(400, 'Chave de recuperação inválida.');
     const existing = await prisma.order.findUnique({ where: { id: input.orderId } });
     if (existing) return authorize(existing, token);
+
+    const promotion = input.promoCode ? promotionFromCode(input.promoCode) : null;
+    if (input.promoCode && !promotion) throw new HttpError(400, 'Link promocional inválido.');
+    if (promotion) {
+      const reserved = await prisma.order.findUnique({ where: { promoCodeHash: promotion.hash } });
+      if (reserved) throw new HttpError(409, 'Esta promoção de uso único já foi utilizada ou está reservada.');
+    }
+
     try {
       return await prisma.order.create({ data: {
-        id: input.orderId, tokenHash: hashToken(token), payload: JSON.stringify(pageInput.parse(input)),
-        payerEmail: input.email, payerCpf: input.cpf, amountCents: config.priceCents ?? 1990,
+        id: input.orderId,
+        tokenHash: hashToken(token),
+        payload: JSON.stringify(pageInput.parse(input)),
+        payerEmail: input.email,
+        payerCpf: input.cpf,
+        amountCents: promotion?.amountCents ?? config.priceCents ?? 1990,
+        promoCodeHash: promotion?.hash ?? null,
       } });
     } catch (error) {
       const raced = await prisma.order.findUnique({ where: { id: input.orderId } });
       if (raced) return authorize(raced, token);
+      if (promotion && await prisma.order.findUnique({ where: { promoCodeHash: promotion.hash } })) {
+        throw new HttpError(409, 'Esta promoção de uso único já foi utilizada ou está reservada.');
+      }
       throw error;
     }
   }
@@ -50,7 +78,7 @@ export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: {
   }
   async function sync(order: Order) {
     if (!order.paymentId && order.status === 'rejected') return {
-      orderId: order.id, paymentId: null, status: 'rejected', isApproved: false,
+      orderId: order.id, paymentId: null, status: 'rejected', isApproved: false, amountCents: order.amountCents,
       result: null, qrCodeBase64: null, qrCodeCopiaCola: '', pageData: JSON.parse(order.payload),
     };
     // A persisted UUID is also the provider idempotency key, including retries after a timeout.
@@ -58,13 +86,18 @@ export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: {
     try { info = order.paymentId ? await gateway.get(order.paymentId) : await gateway.create(order); }
     catch (error) {
       if (!order.paymentId && error instanceof HttpError && error.status === 422) {
-        const rejected = await prisma.order.update({ where: { id: order.id }, data: { status: 'rejected', payerCpf: '', payerEmail: '' } });
+        const rejected = await prisma.order.update({ where: { id: order.id }, data: { status: 'rejected', payerCpf: '', payerEmail: '', promoCodeHash: null } });
         return sync(rejected);
       }
       throw error;
     }
     verify(order, info);
-    await prisma.order.update({ where: { id: order.id }, data: { paymentId: String(info.id), status: info.status || 'pending' } });
+    const status = info.status || 'pending';
+    const releasesPromo = ['cancelled', 'canceled', 'rejected', 'refunded', 'charged_back'].includes(status);
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { paymentId: String(info.id), status, ...(releasesPromo ? { promoCodeHash: null } : {}) },
+    });
     if (info.status === 'approved') {
       const payload = pageInput.parse(JSON.parse(order.payload));
       const photos = payload.fotoUrls?.length ? payload.fotoUrls : [payload.fotoUrl];
@@ -95,7 +128,7 @@ export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: {
     return {
       pageData: JSON.parse(order.payload),
       orderId: order.id, paymentId: String(info.id), status: info.status || 'pending',
-      isApproved: info.status === 'approved',
+      isApproved: info.status === 'approved', amountCents: order.amountCents,
       // A successful payment alone is never reported as delivered.
       result: url && info.status === 'approved' ? { url, qrCode: await QRCode.toDataURL(url, { width: 1200, margin: 4 }) } : null,
       qrCodeBase64: info.point_of_interaction?.transaction_data?.qr_code_base64 ? `data:image/png;base64,${info.point_of_interaction.transaction_data.qr_code_base64}` : null,
@@ -144,10 +177,25 @@ export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: {
 
     const cancelled = await prisma.order.update({
       where: { id: order.id },
-      data: { status: 'cancelled', payerCpf: '', payerEmail: '' },
+      data: { status: 'cancelled', payerCpf: '', payerEmail: '', promoCodeHash: null },
     });
     return { orderId: cancelled.id, status: cancelled.status };
   }
 
-  return { save, sync, get, cancel };
+  async function promoInfo(code: string, orderId?: string) {
+    const promotion = promotionFromCode(code);
+    if (!promotion) return null;
+    const reserved = await prisma.order.findUnique({
+      where: { promoCodeHash: promotion.hash },
+      select: { id: true, status: true },
+    });
+    return {
+      valid: true,
+      available: !reserved || reserved.id === orderId,
+      amountCents: promotion.amountCents,
+      status: reserved?.status || null,
+    };
+  }
+
+  return { save, sync, get, cancel, promoInfo };
 }
