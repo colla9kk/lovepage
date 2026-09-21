@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useCheckout } from '@/hooks/useCheckout';
-import { Heart, Image as ImageIcon, Calendar, Sparkles, Clock, Copy, Check, Download, Music, Upload, CreditCard, Lock, CheckCircle2, X, Loader2 } from 'lucide-react';
+import { Heart, Image as ImageIcon, Calendar, Sparkles, Clock, Copy, Check, Download, Music, Upload, CreditCard, Lock, CheckCircle2, X, Loader2, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 function ChuvaDeCoracoes() {
   // Deterministic positions keep server rendering and hydration identical.
@@ -56,6 +56,42 @@ function ChuvaDeCoracoes() {
   );
 }
 
+const DEFAULT_PHOTO = 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=800';
+
+async function compressPhoto(file: File): Promise<string> {
+  const source = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Não foi possível ler a foto.'));
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsDataURL(file);
+  });
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new window.Image();
+    img.onerror = () => reject(new Error('Não foi possível abrir a foto.'));
+    img.onload = () => resolve(img);
+    img.src = source;
+  });
+
+  const maxSide = 1600;
+  const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Não foi possível preparar a foto.');
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  let quality = 0.84;
+  let result = canvas.toDataURL('image/webp', quality);
+  const bytes = (value: string) => Math.ceil((value.length - value.indexOf(',') - 1) * 0.75);
+  while (bytes(result) > 700 * 1024 && quality > 0.5) {
+    quality -= 0.08;
+    result = canvas.toDataURL('image/webp', quality);
+  }
+  return result;
+}
+
 export default function Home() {
   const payment = useCheckout();
   const priceCents = Number(process.env.NEXT_PUBLIC_PRICE_CENTS || 1990);
@@ -63,7 +99,8 @@ export default function Home() {
   const [nomeCasalInput, setNomeCasal] = useState('Matheus & Marianne');
   const [dataInicioInput, setDataInicio] = useState('2024-01-01');
   const [mensagemInput, setMensagem] = useState('Cada segundo ao seu lado é um presente inesquecível. Te amo!');
-  const [fotoUrlInput, setFotoUrl] = useState('https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=800');
+  const [fotoUrlsInput, setFotoUrls] = useState<string[]>([DEFAULT_PHOTO]);
+  const [previewPhotoIndex, setPreviewPhotoIndex] = useState(0);
   const [spotifyTrackIdInput, setSpotifyTrackId] = useState('4cOdK2wGLETKBW3PvgPWqT');
 
   const [tempo, setTempo] = useState({ dias: 0, horas: 0, minutos: 0, segundos: 0 });
@@ -80,7 +117,14 @@ export default function Home() {
   const nomeCasal = payment.checkout?.pageData?.nomeCasal ?? nomeCasalInput;
   const dataInicio = payment.checkout?.pageData?.dataInicio ?? dataInicioInput;
   const mensagem = payment.checkout?.pageData?.mensagem ?? mensagemInput;
-  const fotoUrl = payment.checkout?.pageData?.fotoUrl ?? fotoUrlInput;
+  const checkoutPhotos = payment.checkout?.pageData?.fotoUrls;
+  const fotoUrls = checkoutPhotos?.length
+    ? checkoutPhotos
+    : payment.checkout?.pageData?.fotoUrl
+      ? [payment.checkout.pageData.fotoUrl]
+      : fotoUrlsInput;
+  const fotoUrl = fotoUrls[0] || DEFAULT_PHOTO;
+  const fotoPreview = fotoUrls[Math.min(previewPhotoIndex, fotoUrls.length - 1)] || fotoUrl;
   const spotifyTrackId = payment.checkout?.pageData?.spotifyTrackId ?? spotifyTrackIdInput;
 
   useEffect(() => {
@@ -101,28 +145,48 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [dataInicio]);
 
-  const handleUploadFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-        alert('Selecione uma imagem JPEG, PNG ou WebP.');
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        alert('A fotografia deve ter um tamanho de até 5 MB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFotoUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const handleUploadFotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+
+    const currentCount = fotoUrlsInput.length === 1 && fotoUrlsInput[0] === DEFAULT_PHOTO ? 0 : fotoUrlsInput.length;
+    if (currentCount + files.length > 10) {
+      alert(`Você pode usar até 10 fotos. Ainda cabem ${Math.max(0, 10 - currentCount)}.`);
+      return;
     }
+    if (files.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) {
+      alert('Use apenas imagens JPEG, PNG ou WebP.');
+      return;
+    }
+    if (files.some(file => file.size > 12 * 1024 * 1024)) {
+      alert('Cada arquivo original deve ter no máximo 12 MB.');
+      return;
+    }
+
+    try {
+      const compressed = await Promise.all(files.map(compressPhoto));
+      setFotoUrls(previous => {
+        const base = previous.length === 1 && previous[0] === DEFAULT_PHOTO ? [] : previous;
+        return [...base, ...compressed].slice(0, 10);
+      });
+      setPreviewPhotoIndex(currentCount);
+    } catch (cause) {
+      alert(cause instanceof Error ? cause.message : 'Não foi possível preparar as fotos.');
+    }
+  };
+
+  const removerFoto = (index: number) => {
+    setFotoUrls(previous => {
+      const next = previous.filter((_, photoIndex) => photoIndex !== index);
+      return next.length ? next : [DEFAULT_PHOTO];
+    });
+    setPreviewPhotoIndex(0);
   };
 
   const iniciarCheckout = async () => {
     setModalPixOpen(true);
-    if (!payment.session) await payment.start({ nomeCasal, dataInicio, mensagem, fotoUrl, spotifyTrackId, email, cpf });
+    if (!payment.session) await payment.start({ nomeCasal, dataInicio, mensagem, fotoUrl, fotoUrls, spotifyTrackId, email, cpf });
   };
 
   const copiarPix = async () => {
@@ -150,7 +214,8 @@ export default function Home() {
     setNomeCasal(nomeCasal);
     setDataInicio(dataInicio);
     setMensagem(mensagem);
-    setFotoUrl(fotoUrl);
+    setFotoUrls(fotoUrls);
+    setPreviewPhotoIndex(0);
     setSpotifyTrackId(spotifyTrackId);
 
     const cancelled = await payment.cancelPending();
@@ -209,14 +274,15 @@ export default function Home() {
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-                <ImageIcon size={16} /> Foto do Casal
+                <ImageIcon size={16} /> Álbum do Casal
               </label>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <input
                     type="file"
+                    multiple
                     accept="image/jpeg,image/png,image/webp"
-                    onChange={handleUploadFoto}
+                    onChange={handleUploadFotos}
                     className="hidden"
                     id="foto-upload"
                   />
@@ -224,16 +290,39 @@ export default function Home() {
                     htmlFor="foto-upload"
                     className="bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 text-xs px-4 py-2.5 rounded-lg cursor-pointer flex items-center gap-2 transition font-medium"
                   >
-                    <Upload size={14} /> Selecionar Fotografia do Telemóvel/PC
+                    <Upload size={14} /> Adicionar fotos
                   </label>
+                  <span className="text-xs text-slate-400">{fotoUrls.length}/10 fotos</span>
                 </div>
-                <p className="text-[11px] text-slate-500">Ou cole a URL direta de uma imagem da internet:</p>
+
+                <div className="grid grid-cols-5 gap-2">
+                  {fotoUrls.map((src, index) => (
+                    <div key={`${src.slice(0, 24)}-${index}`} className="relative aspect-square rounded-lg overflow-hidden border border-slate-700 bg-slate-950">
+                      <img src={src} alt={`Foto ${index + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removerFoto(index)}
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-slate-950/85 text-rose-300 flex items-center justify-center hover:bg-rose-600 hover:text-white transition"
+                        aria-label={`Remover foto ${index + 1}`}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-slate-500">Você pode selecionar várias fotos de uma vez. Elas são otimizadas automaticamente antes do envio.</p>
+                <p className="text-[11px] text-slate-500">Ou use uma URL HTTPS como primeira foto:</p>
                 <input
                   type="text"
-                  value={fotoUrl.startsWith('data:') ? '[Fotografia enviada do ficheiro local]' : fotoUrl}
-                  onChange={(e) => setFotoUrl(e.target.value)}
+                  value={fotoUrl.startsWith('data:') ? '' : fotoUrl}
+                  onChange={(e) => setFotoUrls(previous => {
+                    const next = [...previous];
+                    next[0] = e.target.value || DEFAULT_PHOTO;
+                    return next;
+                  })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
-                  placeholder="https://..."
+                  placeholder={fotoUrl.startsWith('data:') ? 'Foto principal enviada pelo dispositivo' : 'https://...'}
                 />
               </div>
             </div>
@@ -338,8 +427,43 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="relative w-52 h-64 mx-auto rounded-2xl overflow-hidden border-2 border-slate-800 shadow-2xl shrink-0">
-                <img src={fotoUrl || 'https://via.placeholder.com/300'} alt="Casal" className="w-full h-full object-cover" />
+              <div className="space-y-2 shrink-0">
+                <div className="relative w-52 h-64 mx-auto rounded-2xl overflow-hidden border-2 border-slate-800 shadow-2xl bg-slate-900">
+                  <img src={fotoPreview || 'https://via.placeholder.com/300'} alt={`Foto ${previewPhotoIndex + 1} do casal`} className="w-full h-full object-cover" />
+                  {fotoUrls.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewPhotoIndex(index => (index - 1 + fotoUrls.length) % fotoUrls.length)}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/75 flex items-center justify-center text-white"
+                        aria-label="Foto anterior"
+                      >
+                        <ChevronLeft size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewPhotoIndex(index => (index + 1) % fotoUrls.length)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-950/75 flex items-center justify-center text-white"
+                        aria-label="Próxima foto"
+                      >
+                        <ChevronRight size={18} />
+                      </button>
+                    </>
+                  )}
+                </div>
+                {fotoUrls.length > 1 && (
+                  <div className="flex justify-center gap-1.5">
+                    {fotoUrls.map((_, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => setPreviewPhotoIndex(index)}
+                        className={`h-1.5 rounded-full transition-all ${index === previewPhotoIndex ? 'w-5 bg-rose-500' : 'w-1.5 bg-slate-600'}`}
+                        aria-label={`Ver foto ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
               <h2 className="text-2xl font-bold text-rose-400">{nomeCasal || 'Seus Nomes'}</h2>
