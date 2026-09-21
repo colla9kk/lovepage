@@ -31,6 +31,7 @@ export const pageInput = z.object({
 });
 export const checkoutInput = pageInput.extend({
   orderId: z.string().uuid(),
+  promoCode: z.string().trim().regex(/^[A-Za-z0-9_-]{16,128}$/).optional(),
   email: z.string().trim().email().max(254),
   cpf: z.string().transform(value => value.replace(/[.\-\s]/g, '')).refine(validCpf, 'CPF inválido.'),
 });
