@@ -1,4 +1,5 @@
 import express, { ErrorRequestHandler } from 'express';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
@@ -6,7 +7,15 @@ import { ZodError } from 'zod';
 import { checkoutInput } from './validation';
 import { createCheckout, Gateway, HttpError } from './checkout';
 import { validSignature } from './webhook';
-export function createApp(prisma: PrismaClient, gateway: Gateway, config: { frontendUrl: string; collectorId: string; webhookSecret: string; trustProxy?: number; checkoutLimit?: number; priceCents?: number }) {
+export function createApp(prisma: PrismaClient, gateway: Gateway, config: {
+  frontendUrl: string;
+  collectorId: string;
+  webhookSecret: string;
+  trustProxy?: number;
+  checkoutLimit?: number;
+  priceCents?: number;
+  adminPassword?: string;
+}) {
   const app = express();
   const checkout = createCheckout(prisma, gateway, config);
   app.disable('x-powered-by');
@@ -16,6 +25,22 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: { fron
   app.use('/api/checkout', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
   app.use('/api/checkout', rateLimit({ windowMs: 60000, limit: 90, standardHeaders: 'draft-7', legacyHeaders: false }));
   const token = (req: express.Request) => req.get('authorization')?.replace(/^Bearer /, '') || '';
+  const sameSecret = (received: string, expected: string) => {
+    const left = createHash('sha256').update(received).digest();
+    const right = createHash('sha256').update(expected).digest();
+    return timingSafeEqual(left, right);
+  };
+  const requireAdmin: express.RequestHandler = (req, res, next) => {
+    if (!config.adminPassword) {
+      res.status(503).json({ error: 'Painel administrativo ainda não foi ativado.' });
+      return;
+    }
+    if (!sameSecret(token(req), config.adminPassword)) {
+      res.status(401).json({ error: 'Senha administrativa inválida.' });
+      return;
+    }
+    next();
+  };
   const photosFromStoredValue = (value: string) => {
     if (!value.startsWith('[')) return [value];
     try {
@@ -26,6 +51,99 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: { fron
     }
   };
   app.get('/health', async (_req, res) => { await prisma.$queryRaw`SELECT 1`; res.json({ ok: true }); });
+
+  const metricTypes = new Set(['landing_view', 'checkout_click', 'page_view', 'whatsapp_share']);
+  app.post('/api/metrics', rateLimit({ windowMs: 60000, limit: 120 }), async (req, res) => {
+    const type = typeof req.body?.type === 'string' ? req.body.type : '';
+    const orderId = typeof req.body?.orderId === 'string' && req.body.orderId.length <= 80 ? req.body.orderId : null;
+    const pageSlug = typeof req.body?.pageSlug === 'string' && req.body.pageSlug.length <= 160 ? req.body.pageSlug : null;
+    if (!metricTypes.has(type)) {
+      res.status(400).json({ error: 'Métrica inválida.' });
+      return;
+    }
+    await prisma.metricEvent.create({ data: { type, orderId, pageSlug } });
+    res.status(204).end();
+  });
+
+  app.get('/api/admin/dashboard', rateLimit({ windowMs: 60000, limit: 30 }), requireAdmin, async (_req, res) => {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [
+      totalOrders,
+      approvedOrders,
+      pendingOrders,
+      cancelledOrders,
+      revenue,
+      pages,
+      groupedMetrics,
+      recentOrders,
+    ] = await Promise.all([
+      prisma.order.count(),
+      prisma.order.count({ where: { status: 'approved' } }),
+      prisma.order.count({ where: { status: { in: ['pending', 'in_process', 'authorized'] } } }),
+      prisma.order.count({ where: { status: { in: ['cancelled', 'canceled', 'rejected', 'refunded', 'charged_back'] } } }),
+      prisma.order.aggregate({ where: { status: 'approved' }, _sum: { amountCents: true } }),
+      prisma.page.count(),
+      prisma.metricEvent.groupBy({
+        by: ['type'],
+        where: { createdAt: { gte: since } },
+        _count: { _all: true },
+      }),
+      prisma.order.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        select: {
+          id: true,
+          status: true,
+          amountCents: true,
+          paymentId: true,
+          createdAt: true,
+          updatedAt: true,
+          payload: true,
+          page: { select: { slug: true, theme: true } },
+        },
+      }),
+    ]);
+
+    const metrics = Object.fromEntries(groupedMetrics.map(item => [item.type, item._count._all]));
+    const orders = recentOrders.map(order => {
+      let nomeCasal = '—';
+      try {
+        const parsed = JSON.parse(order.payload);
+        if (typeof parsed?.nomeCasal === 'string') nomeCasal = parsed.nomeCasal;
+      } catch {}
+      return {
+        id: order.id,
+        status: order.status,
+        amountCents: order.amountCents,
+        paymentId: order.paymentId,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        nomeCasal,
+        pageSlug: order.page?.slug || null,
+        theme: order.page?.theme || null,
+      };
+    });
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      summary: {
+        totalOrders,
+        approvedOrders,
+        pendingOrders,
+        cancelledOrders,
+        pages,
+        revenueCents: revenue._sum.amountCents || 0,
+      },
+      metrics30d: {
+        landingViews: metrics.landing_view || 0,
+        checkoutClicks: metrics.checkout_click || 0,
+        pageViews: metrics.page_view || 0,
+        whatsappShares: metrics.whatsapp_share || 0,
+      },
+      orders,
+    });
+  });
+
   app.post('/api/checkout/pix', rateLimit({ windowMs: 60000, limit: config.checkoutLimit ?? 10 }), async (req, res) => {
     const order = await checkout.save(checkoutInput.parse(req.body), token(req));
     res.json({ success: true, ...await checkout.sync(order) });
@@ -40,7 +158,7 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: { fron
   app.get('/api/checkout/status/:paymentId', (_req, res) => { res.status(410).json({ error: 'Utilize a consulta autenticada do pedido.' }); });
   app.get('/api/pages/:slug', async (req, res) => {
     const page = await prisma.page.findUnique({ where: { slug: req.params.slug }, select: {
-      nomeCasal: true, dataInicio: true, mensagem: true, fotoUrl: true, spotifyTrackId: true, slug: true,
+      nomeCasal: true, dataInicio: true, mensagem: true, fotoUrl: true, spotifyTrackId: true, theme: true, slug: true,
     } });
     if (!page) { res.status(404).json({ error: 'Página não encontrada.' }); return; }
     const fotoUrls = photosFromStoredValue(page.fotoUrl);
