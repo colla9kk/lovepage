@@ -58,6 +58,23 @@ function ChuvaDeCoracoes() {
 
 const DEFAULT_PHOTO = 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=800';
 
+function spotifyTrackIdFromInput(value: string) {
+  const input = value.trim();
+  if (!input) return '';
+  if (/^[A-Za-z0-9]{22}$/.test(input)) return input;
+
+  const uri = /^spotify:track:([A-Za-z0-9]{22})$/.exec(input);
+  if (uri) return uri[1];
+
+  try {
+    const url = new URL(input);
+    if (!['open.spotify.com', 'www.open.spotify.com'].includes(url.hostname.toLowerCase())) return '';
+    return /^\/track\/([A-Za-z0-9]{22})\/?$/.exec(url.pathname)?.[1] || '';
+  } catch {
+    return '';
+  }
+}
+
 async function compressPhoto(file: File): Promise<string> {
   const source = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -108,7 +125,7 @@ export default function Home() {
   const [mensagemInput, setMensagem] = useState('Cada segundo ao seu lado é um presente inesquecível. Te amo!');
   const [fotoUrlsInput, setFotoUrls] = useState<string[]>([DEFAULT_PHOTO]);
   const [previewPhotoIndex, setPreviewPhotoIndex] = useState(0);
-  const [spotifyTrackIdInput, setSpotifyTrackId] = useState('4cOdK2wGLETKBW3PvgPWqT');
+  const [spotifyTrackIdInput, setSpotifyTrackId] = useState('https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT');
 
   const [tempo, setTempo] = useState({ dias: 0, horas: 0, minutos: 0, segundos: 0 });
   const [email, setEmail] = useState('');
@@ -133,6 +150,7 @@ export default function Home() {
   const fotoUrl = fotoUrls[0] || DEFAULT_PHOTO;
   const fotoPreview = fotoUrls[Math.min(previewPhotoIndex, fotoUrls.length - 1)] || fotoUrl;
   const spotifyTrackId = payment.checkout?.pageData?.spotifyTrackId ?? spotifyTrackIdInput;
+  const spotifyEmbedTrackId = spotifyTrackIdFromInput(spotifyTrackId);
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('promo')?.trim() || '';
@@ -328,9 +346,21 @@ export default function Home() {
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1 flex items-center gap-2">
-                <Music size={16} /> ID da Música do Spotify (Opcional)
+                <Music size={16} /> Link da Música no Spotify (Opcional)
               </label>
-              <input type="text" value={spotifyTrackId} onChange={(e) => setSpotifyTrackId(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500" placeholder="Ex: 4cOdK2wGLETKBW3PvgPWqT" />
+              <input
+                type="url"
+                value={spotifyTrackId}
+                onChange={(e) => setSpotifyTrackId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                placeholder="https://open.spotify.com/track/..."
+              />
+              <p className="text-[11px] text-slate-500 mt-2">
+                No Spotify: Compartilhar → Copiar link da música. Cole o link inteiro aqui.
+              </p>
+              {spotifyTrackId && !spotifyEmbedTrackId && (
+                <p className="text-[11px] text-amber-300 mt-1">Cole o link de uma música do Spotify.</p>
+              )}
             </div>
 
             <div>
@@ -475,10 +505,10 @@ export default function Home() {
             <ChuvaDeCoracoes />
 
             <div className="relative z-20 flex flex-col h-full overflow-y-auto space-y-4 pr-1">
-              {spotifyTrackId && (
+              {spotifyEmbedTrackId && (
                 <div className="w-full rounded-xl overflow-hidden shrink-0 shadow-md">
                   <iframe
-                    src={`https://open.spotify.com/embed/track/${spotifyTrackId}?utm_source=generator&theme=0`}
+                    src={`https://open.spotify.com/embed/track/${spotifyEmbedTrackId}?utm_source=generator&theme=0`}
                     width="100%"
                     height="80"
                     frameBorder="0"
