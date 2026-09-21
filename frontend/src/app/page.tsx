@@ -58,6 +58,8 @@ function ChuvaDeCoracoes() {
 
 export default function Home() {
   const payment = useCheckout();
+  const priceCents = Number(process.env.NEXT_PUBLIC_PRICE_CENTS || 1990);
+  const priceLabel = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(priceCents / 100);
   const [nomeCasalInput, setNomeCasal] = useState('Matheus & Marianne');
   const [dataInicioInput, setDataInicio] = useState('2024-01-01');
   const [mensagemInput, setMensagem] = useState('Cada segundo ao seu lado é um presente inesquecível. Te amo!');
@@ -152,7 +154,7 @@ export default function Home() {
           className="bg-rose-600 hover:bg-rose-500 text-white font-medium px-6 py-2.5 rounded-full transition shadow-lg shadow-rose-950 flex items-center gap-2 cursor-pointer disabled:opacity-50"
         >
           {loading ? <Loader2 className="animate-spin" size={18} /> : <CreditCard size={18} />}
-          {loading ? 'Carregando...' : payment.session ? 'Ver meu pedido' : 'Finalizar & Gerar Presente (R$ 19,90)'}
+          {loading ? 'Carregando...' : payment.session ? 'Ver meu pedido' : `Finalizar & Gerar Presente (${priceLabel})`}
         </button>
       </header>
 
@@ -241,7 +243,7 @@ export default function Home() {
               className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-rose-950 flex items-center justify-center gap-2 text-base mt-4 cursor-pointer disabled:opacity-50"
             >
               {loading ? <Loader2 className="animate-spin" size={18} /> : <Lock size={18} />}
-              {loading ? 'Carregando...' : payment.session ? 'Ver meu pedido' : 'Liberar QR Code & Link Exclusivo (R$ 19,90)'}
+              {loading ? 'Carregando...' : payment.session ? 'Ver meu pedido' : `Liberar QR Code & Link Exclusivo (${priceLabel})`}
             </button>
         </section>
 
@@ -365,7 +367,7 @@ export default function Home() {
                   </span>
                   <h3 className="text-2xl font-bold text-white mt-3">Libere seu Presente</h3>
                   <p className="text-slate-400 text-xs mt-1">Escaneie o PIX real do Mercado Pago no seu app do banco.</p>
-                  <div className="text-3xl font-extrabold text-rose-400 mt-2">R$ 19,90</div>
+                  <div className="text-3xl font-extrabold text-rose-400 mt-2">{priceLabel}</div>
                 </div>
 
                 {/* QR Code Real Gerado pelo Mercado Pago */}
