@@ -161,11 +161,23 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: {
   app.get('/api/checkout/status/:paymentId', (_req, res) => { res.status(410).json({ error: 'Utilize a consulta autenticada do pedido.' }); });
   app.get('/api/pages/:slug', async (req, res) => {
     const page = await prisma.page.findUnique({ where: { slug: req.params.slug }, select: {
-      nomeCasal: true, dataInicio: true, mensagem: true, fotoUrl: true, spotifyTrackId: true, theme: true, slug: true,
+      nomeCasal: true, dataInicio: true, mensagem: true, fotoUrl: true, spotifyTrackId: true, theme: true, extraData: true, slug: true,
     } });
     if (!page) { res.status(404).json({ error: 'Página não encontrada.' }); return; }
     const fotoUrls = photosFromStoredValue(page.fotoUrl);
-    res.json({ ...page, fotoUrl: fotoUrls[0], fotoUrls });
+    let relationLabel = '';
+    let highlights: string[] = [];
+    if (page.extraData) {
+      try {
+        const extra = JSON.parse(page.extraData);
+        if (typeof extra?.relationLabel === 'string') relationLabel = extra.relationLabel;
+        if (Array.isArray(extra?.highlights)) {
+          highlights = extra.highlights.filter((item: unknown): item is string => typeof item === 'string').slice(0, 3);
+        }
+      } catch {}
+    }
+    const { extraData: _extraData, ...publicPage } = page;
+    res.json({ ...publicPage, fotoUrl: fotoUrls[0], fotoUrls, relationLabel, highlights });
   });
   app.get('/api/pages/:slug/photo', async (req, res) => {
     const page = await prisma.page.findUnique({ where: { slug: req.params.slug }, select: { fotoUrl: true } });
