@@ -19,6 +19,7 @@ const notificationUrl = process.env.MERCADO_PAGO_NOTIFICATION_URL;
 if (notificationUrl && new URL(notificationUrl).protocol !== 'https:') throw new Error('MERCADO_PAGO_NOTIFICATION_URL deve usar HTTPS.');
 const { app, checkout } = createApp(prisma, {
   get: id => payment.get({ id }),
+  cancel: (id, idempotencyKey) => payment.cancel({ id, requestOptions: { idempotencyKey } }),
   create: async order => {
     try { return await payment.create({
     requestOptions: { idempotencyKey: order.id },
