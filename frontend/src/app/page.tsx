@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useCheckout } from '@/hooks/useCheckout';
+import { API_URL } from '@/lib/api';
 import { Heart, Image as ImageIcon, Calendar, Sparkles, Clock, Copy, Check, Download, Music, Upload, CreditCard, Lock, CheckCircle2, X, Loader2, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 function ChuvaDeCoracoes() {
@@ -94,8 +95,14 @@ async function compressPhoto(file: File): Promise<string> {
 
 export default function Home() {
   const payment = useCheckout();
-  const priceCents = Number(process.env.NEXT_PUBLIC_PRICE_CENTS || 1990);
-  const priceLabel = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(priceCents / 100);
+  const basePriceCents = Number(process.env.NEXT_PUBLIC_PRICE_CENTS || 1990);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoAmountCents, setPromoAmountCents] = useState<number | null>(null);
+  const [promoAvailable, setPromoAvailable] = useState(false);
+  const [promoChecking, setPromoChecking] = useState(false);
+  const [promoMessage, setPromoMessage] = useState('');
+  const effectivePriceCents = payment.checkout?.amountCents ?? (promoAvailable && promoAmountCents ? promoAmountCents : basePriceCents);
+  const priceLabel = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(effectivePriceCents / 100);
   const [nomeCasalInput, setNomeCasal] = useState('Matheus & Marianne');
   const [dataInicioInput, setDataInicio] = useState('2024-01-01');
   const [mensagemInput, setMensagem] = useState('Cada segundo ao seu lado é um presente inesquecível. Te amo!');
@@ -109,7 +116,7 @@ export default function Home() {
   const [copiado, setCopiado] = useState(false);
   const [modalPixOpen, setModalPixOpen] = useState(false);
   const [pixCopiado, setPixCopiado] = useState(false);
-  const loading = payment.loading || !payment.ready;
+  const loading = payment.loading || !payment.ready || promoChecking;
   const resultado = payment.checkout?.result || null;
   const pagamentoAprovado = !!resultado;
   const pixQrCodeBase64 = payment.checkout?.qrCodeBase64;
@@ -126,6 +133,50 @@ export default function Home() {
   const fotoUrl = fotoUrls[0] || DEFAULT_PHOTO;
   const fotoPreview = fotoUrls[Math.min(previewPhotoIndex, fotoUrls.length - 1)] || fotoUrl;
   const spotifyTrackId = payment.checkout?.pageData?.spotifyTrackId ?? spotifyTrackIdInput;
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('promo')?.trim() || '';
+    setPromoCode(code);
+  }, []);
+
+  useEffect(() => {
+    if (!promoCode || !payment.ready) {
+      setPromoAmountCents(null);
+      setPromoAvailable(false);
+      setPromoMessage('');
+      return;
+    }
+    let stopped = false;
+    const controller = new AbortController();
+    setPromoChecking(true);
+    const query = payment.session ? `?orderId=${encodeURIComponent(payment.session.orderId)}` : '';
+    fetch(`${API_URL}/api/promos/${encodeURIComponent(promoCode)}${query}`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then(async res => ({ res, data: await res.json().catch(() => ({})) }))
+      .then(({ res, data }) => {
+        if (stopped) return;
+        if (!res.ok || !data.valid) {
+          setPromoAmountCents(null);
+          setPromoAvailable(false);
+          setPromoMessage('Este link promocional não é válido.');
+          return;
+        }
+        setPromoAmountCents(Number(data.amountCents));
+        setPromoAvailable(Boolean(data.available));
+        setPromoMessage(data.available ? 'Preço especial liberado para este link.' : 'Esta promoção de uso único já foi utilizada.');
+      })
+      .catch(() => {
+        if (!stopped) {
+          setPromoAmountCents(null);
+          setPromoAvailable(false);
+          setPromoMessage('Não foi possível validar o link promocional agora.');
+        }
+      })
+      .finally(() => { if (!stopped) setPromoChecking(false); });
+    return () => { stopped = true; controller.abort(); };
+  }, [promoCode, payment.ready, payment.session?.orderId]);
 
   useEffect(() => {
     const calcularTempo = () => {
@@ -186,7 +237,17 @@ export default function Home() {
 
   const iniciarCheckout = async () => {
     setModalPixOpen(true);
-    if (!payment.session) await payment.start({ nomeCasal, dataInicio, mensagem, fotoUrl, fotoUrls, spotifyTrackId, email, cpf });
+    if (!payment.session) await payment.start({
+      nomeCasal,
+      dataInicio,
+      mensagem,
+      fotoUrl,
+      fotoUrls,
+      spotifyTrackId,
+      email,
+      cpf,
+      ...(promoAvailable && promoCode ? { promoCode } : {}),
+    });
   };
 
   const copiarPix = async () => {
@@ -251,6 +312,15 @@ export default function Home() {
             </h1>
             <p className="text-slate-400 text-sm mt-1">Preencha os campos e veja a prévia e o QR Code ao lado.</p>
           </div>
+
+          {promoCode && (
+            <div className={`rounded-xl border p-3 text-sm ${promoAvailable ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'}`}>
+              {promoChecking ? 'Validando seu preço especial...' : promoMessage}
+              {promoAvailable && promoAmountCents && (
+                <span className="font-bold"> Valor deste link: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(promoAmountCents / 100)}.</span>
+              )}
+            </div>
+          )}
 
           <fieldset disabled={!!payment.session || loading} className="space-y-4 disabled:opacity-70">
             <div>
