@@ -35,6 +35,13 @@ const { app } = createApp(prisma, {
     if (!info) throw new Error('Not found');
     return info;
   },
+  async cancel(id) {
+    const info = [...payments.values()].find(payment => payment.id === id);
+    if (!info) throw new Error('Not found');
+    if (info.status === 'approved') throw new Error('Cannot cancel approved');
+    info.status = 'cancelled';
+    return info;
+  },
 }, { frontendUrl: 'https://love.example', collectorId: '123', webhookSecret: 'test-secret', checkoutLimit: 100 });
 let server: Server;
 let base: string;
@@ -114,6 +121,25 @@ test('cancelled payment never publishes a page', async () => {
   payments.get(input.orderId)!.status = 'cancelled';
   const data = await (await request(`/api/checkout/orders/${input.orderId}`, key)).json();
   assert.equal(data.status, 'cancelled'); assert.equal(data.result, null); assert.equal(await prisma.page.count(), 0);
+});
+test('buyer can cancel a pending PIX, edit, and create a fresh order', async () => {
+  const first = draft(); const key = token();
+  await request('/api/checkout/pix', key, first);
+  const cancelled = await fetch(`${base}/api/checkout/orders/${first.orderId}/cancel`, {
+    method: 'POST', headers: { Authorization: `Bearer ${key}` },
+  });
+  assert.equal(cancelled.status, 200);
+  assert.equal((await cancelled.json()).status, 'cancelled');
+  assert.equal(payments.get(first.orderId)!.status, 'cancelled');
+  assert.equal((await prisma.order.findUniqueOrThrow({ where: { id: first.orderId } })).payerCpf, '');
+  assert.equal(await prisma.page.count(), 0);
+
+  const second = { ...draft(), nomeCasal: 'Ana & Maria' };
+  const secondKey = token();
+  const created = await request('/api/checkout/pix', secondKey, second);
+  assert.equal(created.status, 200);
+  assert.equal(payments.get(second.orderId)!.status, 'pending');
+  assert.notEqual(second.orderId, first.orderId);
 });
 test('webhook requires valid signature and reconciles payment from provider', async () => {
   const input = draft(); const key = token(); await request('/api/checkout/pix', key, input);
