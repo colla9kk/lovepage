@@ -6,7 +6,7 @@ import { ZodError } from 'zod';
 import { checkoutInput } from './validation';
 import { createCheckout, Gateway, HttpError } from './checkout';
 import { validSignature } from './webhook';
-export function createApp(prisma: PrismaClient, gateway: Gateway, config: { frontendUrl: string; collectorId: string; webhookSecret: string; trustProxy?: number; checkoutLimit?: number }) {
+export function createApp(prisma: PrismaClient, gateway: Gateway, config: { frontendUrl: string; collectorId: string; webhookSecret: string; trustProxy?: number; checkoutLimit?: number; priceCents?: number }) {
   const app = express();
   const checkout = createCheckout(prisma, gateway, config);
   app.disable('x-powered-by');
