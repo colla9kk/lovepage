@@ -8,6 +8,7 @@ type Dashboard = {
   summary: {
     totalOrders: number;
     approvedOrders: number;
+    approvedOrders30d: number;
     pendingOrders: number;
     cancelledOrders: number;
     pages: number;
@@ -72,7 +73,7 @@ export default function AdminPage() {
 
   const conversion = useMemo(() => {
     if (!dashboard?.metrics30d.landingViews) return 0;
-    return Math.round((dashboard.summary.approvedOrders / dashboard.metrics30d.landingViews) * 1000) / 10;
+    return Math.round((dashboard.summary.approvedOrders30d / dashboard.metrics30d.landingViews) * 1000) / 10;
   }, [dashboard]);
 
   if (!dashboard) {
