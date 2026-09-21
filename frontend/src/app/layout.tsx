@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://mylovepage.vercel.app"),
   title: "LovePage | Seu presente romântico",
   description: "Uma página especial para guardar a história do seu amor.",
 };
