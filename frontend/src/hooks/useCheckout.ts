@@ -14,6 +14,7 @@ export function useCheckout() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const busy = useRef(false);
+  const missingPolls = useRef(0);
   useEffect(() => {
     try {
       const saved = localStorage.getItem(KEY);
@@ -41,11 +42,20 @@ export function useCheckout() {
         const data = await res.json();
         if (!res.ok) {
           if (res.status === 404 && !stopped) {
-            localStorage.removeItem(KEY); setSession(null);
-            throw new Error('Pedido não encontrado. Preencha os dados e tente novamente.');
+            missingPolls.current += 1;
+            if (missingPolls.current < 4) {
+              setError('Confirmando seu pedido...');
+              return;
+            }
+            localStorage.removeItem(KEY);
+            setSession(null);
+            setCheckout(null);
+            missingPolls.current = 0;
+            throw new Error('Pedido anterior expirou. Gere o PIX novamente.');
           }
           throw new Error(data.error || 'Não foi possível consultar o pedido.');
         }
+        missingPolls.current = 0;
         if (!stopped) { setCheckout(data); setError(''); }
       } catch (cause) {
         if (!stopped) setError(cause instanceof Error ? cause.message : 'Conexão interrompida. Tentaremos novamente.');
@@ -58,21 +68,35 @@ export function useCheckout() {
     if (busy.current || session || !ready) return;
     busy.current = true; setLoading(true); setError('');
     const next = { orderId: crypto.randomUUID(), token: Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('') };
+    let shouldRecover = true;
     try {
       // Persist the recovery key before creating a charge. Never store CPF or the photo here.
       localStorage.setItem(KEY, JSON.stringify(next));
-      setSession(next);
       const res = await fetch(`${API_URL}/api/checkout/pix`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${next.token}` },
         body: JSON.stringify({ ...draft, orderId: next.orderId }), signal: AbortSignal.timeout(20000),
       });
       const data = await res.json();
       if (!res.ok) {
-        if ([400, 409, 413, 429].includes(res.status)) { localStorage.removeItem(KEY); setSession(null); }
+        if ([400, 409, 413, 429].includes(res.status)) {
+          shouldRecover = false;
+          localStorage.removeItem(KEY);
+          setSession(null);
+        } else {
+          setSession(next);
+        }
         throw new Error(data.error || 'Não foi possível iniciar o pagamento.');
       }
+      setSession(next);
       setCheckout(data);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível iniciar o pagamento.'); }
+    } catch (cause) {
+      if (shouldRecover && localStorage.getItem(KEY)) {
+        // If the network/provider timed out after accepting the request, keep the
+        // recovery session so polling can recover the same idempotent order.
+        setSession(current => current ?? next);
+      }
+      setError(cause instanceof Error ? cause.message : 'Não foi possível iniciar o pagamento.');
+    }
     finally { busy.current = false; setLoading(false); }
   }
   async function cancelPending() {
