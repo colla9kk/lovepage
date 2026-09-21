@@ -9,6 +9,8 @@ function required(name: string) {
   return value;
 }
 const frontendUrl = new URL(required('FRONTEND_URL')).origin;
+const priceCents = Number(process.env.PRICE_CENTS || 1990);
+if (!Number.isInteger(priceCents) || priceCents < 1) throw new Error('PRICE_CENTS deve ser um número inteiro positivo em centavos.');
 if (process.env.NODE_ENV === 'production' && !frontendUrl.startsWith('https://')) throw new Error('FRONTEND_URL deve usar HTTPS em produção.');
 const prisma = new PrismaClient();
 const payment = new Payment(new MercadoPagoConfig({ accessToken: required('MERCADO_PAGO_ACCESS_TOKEN'), options: { timeout: 15000 } }));
@@ -32,7 +34,7 @@ const { app, checkout } = createApp(prisma, {
     throw error;
   }
   },
-}, { frontendUrl, collectorId: required('MERCADO_PAGO_COLLECTOR_ID'), webhookSecret, trustProxy: Number(process.env.TRUST_PROXY_HOPS || 0) });
+}, { frontendUrl, collectorId: required('MERCADO_PAGO_COLLECTOR_ID'), webhookSecret, trustProxy: Number(process.env.TRUST_PROXY_HOPS || 0), priceCents });
 let reconciling = false;
 const timer = setInterval(async () => {
   if (reconciling) return;
