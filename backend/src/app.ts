@@ -70,6 +70,7 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: {
     const [
       totalOrders,
       approvedOrders,
+      approvedOrders30d,
       pendingOrders,
       cancelledOrders,
       revenue,
@@ -79,6 +80,7 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: {
     ] = await Promise.all([
       prisma.order.count(),
       prisma.order.count({ where: { status: 'approved' } }),
+      prisma.order.count({ where: { status: 'approved', createdAt: { gte: since } } }),
       prisma.order.count({ where: { status: { in: ['pending', 'in_process', 'authorized'] } } }),
       prisma.order.count({ where: { status: { in: ['cancelled', 'canceled', 'rejected', 'refunded', 'charged_back'] } } }),
       prisma.order.aggregate({ where: { status: 'approved' }, _sum: { amountCents: true } }),
@@ -129,6 +131,7 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: {
       summary: {
         totalOrders,
         approvedOrders,
+        approvedOrders30d,
         pendingOrders,
         cancelledOrders,
         pages,
