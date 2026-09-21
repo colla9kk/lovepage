@@ -23,7 +23,7 @@ export function authorize(order: Order | null, token: string) {
   return order;
 }
 
-export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: { frontendUrl: string; collectorId: string }) {
+export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: { frontendUrl: string; collectorId: string; priceCents?: number }) {
   async function save(input: CheckoutInput, token: string) {
     if (!/^[a-f0-9]{64}$/.test(token)) throw new HttpError(400, 'Chave de recuperação inválida.');
     const existing = await prisma.order.findUnique({ where: { id: input.orderId } });
@@ -31,7 +31,7 @@ export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: {
     try {
       return await prisma.order.create({ data: {
         id: input.orderId, tokenHash: hashToken(token), payload: JSON.stringify(pageInput.parse(input)),
-        payerEmail: input.email, payerCpf: input.cpf,
+        payerEmail: input.email, payerCpf: input.cpf, amountCents: config.priceCents ?? 1990,
       } });
     } catch (error) {
       const raced = await prisma.order.findUnique({ where: { id: input.orderId } });
