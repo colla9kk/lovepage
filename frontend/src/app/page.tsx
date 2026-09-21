@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useCheckout } from '@/hooks/useCheckout';
-import { trackMetric } from '@/lib/metrics';
+import { trackMetric, type MetricType } from '@/lib/metrics';
+import { CheckoutTrust, TrustAndFaq } from '@/components/TrustAndFaq';
 import { Heart, Image as ImageIcon, Calendar, Sparkles, Clock, Copy, Check, Download, Music, Upload, CreditCard, Lock, CheckCircle2, X, Loader2, ChevronLeft, ChevronRight, Trash2, MessageCircle, Palette } from 'lucide-react';
 
 function ChuvaDeCoracoes() {
@@ -223,6 +224,7 @@ export default function Home() {
     setPromoCode(code);
     if (model === 'romantic' || model === 'friend' || model === 'family') {
       setThemeInput(model);
+      trackMetric('template_select');
       window.setTimeout(() => document.getElementById('criar')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
     }
   }, []);
@@ -310,6 +312,21 @@ export default function Home() {
     setPreviewPhotoIndex(0);
   };
 
+  const trackOnce = (type: MetricType) => {
+    try {
+      const key = `lovepage.metric.${type}`;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {}
+    trackMetric(type);
+  };
+
+  const selecionarTemplate = (value: 'romantic' | 'friend' | 'family', scroll = false) => {
+    if (themeInput !== value) trackMetric('template_select');
+    setThemeInput(value);
+    if (scroll) document.getElementById('criar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const iniciarCheckout = () => {
     if (!payment.session) {
       if (!nomeCasal.trim()) { setFormError(`Preencha: ${templateCopy.nameLabel.toLowerCase()}.`); return; }
@@ -322,6 +339,8 @@ export default function Home() {
       }
       setFormError('');
       setPaymentDataError('');
+      trackOnce('customization_complete');
+      trackOnce('payment_step_open');
     }
     setModalPixOpen(true);
   };
@@ -340,7 +359,7 @@ export default function Home() {
 
     setPaymentDataError('');
     trackMetric('checkout_click');
-    await payment.start({
+    const created = await payment.start({
       nomeCasal,
       dataInicio,
       mensagem,
@@ -354,6 +373,7 @@ export default function Home() {
       cpf,
       ...(promoAvailable && promoCode ? { promoCode } : {}),
     });
+    if (created) trackOnce('pix_created');
   };
 
   const copiarPix = async () => {
@@ -408,7 +428,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans relative">
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur p-4 flex justify-between items-center px-6">
+      <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/90 backdrop-blur p-3 sm:p-4 flex justify-between items-center px-4 sm:px-6">
         <div className="flex items-center gap-2 text-rose-500 font-bold text-xl">
           <Heart className="fill-rose-500" size={24} />
           <span>LovePage</span>
@@ -416,10 +436,11 @@ export default function Home() {
         <button
           onClick={iniciarCheckout}
           disabled={loading}
-          className="bg-rose-600 hover:bg-rose-500 text-white font-medium px-6 py-2.5 rounded-full transition shadow-lg shadow-rose-950 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          className="bg-rose-600 hover:bg-rose-500 text-white font-medium px-3 sm:px-6 py-2.5 rounded-full transition shadow-lg shadow-rose-950 flex items-center gap-2 cursor-pointer disabled:opacity-50 text-sm sm:text-base"
         >
           {loading ? <Loader2 className="animate-spin" size={18} /> : <CreditCard size={18} />}
-          {loading ? 'Carregando...' : payment.session ? 'Ver meu pedido' : `Finalizar & Gerar Presente (${priceLabel})`}
+          <span className="hidden sm:inline">{loading ? 'Carregando...' : payment.session ? 'Ver meu pedido' : `Finalizar & Gerar Presente (${priceLabel})`}</span>
+          <span className="sm:hidden">{loading ? '...' : payment.session ? 'Pedido' : 'Finalizar'}</span>
         </button>
       </header>
 
@@ -467,7 +488,7 @@ export default function Home() {
                 </a>
                 <button
                   type="button"
-                  onClick={() => { setThemeInput('romantic'); document.getElementById('criar')?.scrollIntoView({ behavior: 'smooth' }); }}
+                  onClick={() => selecionarTemplate('romantic', true)}
                   className="bg-rose-600 hover:bg-rose-500 text-white font-semibold py-2.5 rounded-xl text-sm transition"
                 >
                   Escolher
@@ -485,7 +506,7 @@ export default function Home() {
                 </a>
                 <button
                   type="button"
-                  onClick={() => { setThemeInput('friend'); document.getElementById('criar')?.scrollIntoView({ behavior: 'smooth' }); }}
+                  onClick={() => selecionarTemplate('friend', true)}
                   className="bg-cyan-300 hover:bg-cyan-200 text-slate-950 font-bold py-2.5 rounded-xl text-sm transition"
                 >
                   Escolher
@@ -503,7 +524,7 @@ export default function Home() {
                 </a>
                 <button
                   type="button"
-                  onClick={() => { setThemeInput('family'); document.getElementById('criar')?.scrollIntoView({ behavior: 'smooth' }); }}
+                  onClick={() => selecionarTemplate('family', true)}
                   className="bg-amber-200 hover:bg-amber-100 text-amber-950 font-bold py-2.5 rounded-xl text-sm transition"
                 >
                   Escolher
@@ -514,9 +535,9 @@ export default function Home() {
         </div>
       </section>
 
-      <main id="criar" className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 max-w-7xl mx-auto w-full">
+      <main id="criar" className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 p-4 sm:p-6 max-w-7xl mx-auto w-full scroll-mt-20">
         {/* Lado Esquerdo: Formulário */}
-        <section className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6 h-fit">
+        <section className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl shadow-xl space-y-6 h-fit">
           <div className="border-b border-slate-800 pb-4">
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Sparkles className="text-amber-400" size={22} /> Personalize seu Presente
@@ -565,7 +586,7 @@ export default function Home() {
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setThemeInput(value)}
+                    onClick={() => selecionarTemplate(value)}
                     className={`rounded-xl border p-3 text-left transition ${template === value ? 'border-rose-500 bg-rose-500/10' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}
                   >
                     <span className="block text-sm font-semibold">{label}</span>
@@ -713,6 +734,7 @@ export default function Home() {
               {loading ? <Loader2 className="animate-spin" size={18} /> : <Lock size={18} />}
               {loading ? 'Carregando...' : payment.session ? 'Ver meu pedido' : `Liberar QR Code & Link Exclusivo (${priceLabel})`}
             </button>
+            <CheckoutTrust />
         </section>
 
         {/* Lado Direito: QR Code Libertado + Prévia */}
@@ -903,10 +925,42 @@ export default function Home() {
         </section>
       </main>
 
+      <TrustAndFaq />
+
+      <footer className="border-t border-slate-800 bg-slate-950 px-5 py-8 pb-24 lg:pb-8">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+          <div>
+            <div className="flex items-center justify-center sm:justify-start gap-2 text-rose-400 font-bold">
+              <Heart size={16} className="fill-rose-400" /> LovePage
+            </div>
+            <p className="text-xs text-slate-600 mt-1">Presentes digitais personalizados.</p>
+          </div>
+          <nav className="flex items-center gap-5 text-xs text-slate-400">
+            <a href="#faq" className="hover:text-white">FAQ</a>
+            <a href="/privacidade" className="hover:text-white">Privacidade</a>
+            <a href="/termos" className="hover:text-white">Termos de uso</a>
+          </nav>
+        </div>
+      </footer>
+
+      {!modalPixOpen && !resultado && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/95 backdrop-blur p-3 safe-area-pb">
+          <button
+            type="button"
+            onClick={iniciarCheckout}
+            disabled={loading}
+            className="w-full bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-xl"
+          >
+            {loading ? <Loader2 className="animate-spin" size={18} /> : <CreditCard size={18} />}
+            {loading ? 'Carregando...' : `Finalizar presente • ${priceLabel}`}
+          </button>
+        </div>
+      )}
+
       {/* MODAL DE PAGAMENTO PIX MERCADO PAGO */}
       {modalPixOpen && (
         <div role="dialog" aria-modal="true" aria-label="Pagamento do pedido" className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-rose-500/30 w-full max-w-md rounded-3xl p-6 text-center shadow-2xl relative space-y-5 animate-scale-up">
+          <div className="bg-slate-900 border border-rose-500/30 w-full max-w-md max-h-[92vh] overflow-y-auto rounded-3xl p-5 sm:p-6 text-center shadow-2xl relative space-y-5 animate-scale-up">
             
             <button
               aria-label="Fechar pagamento"
@@ -966,14 +1020,10 @@ export default function Home() {
                     />
                   </div>
 
-                  <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
-                    <div className="flex gap-2 items-start">
-                      <Lock size={15} className="text-emerald-400 mt-0.5 shrink-0" />
-                      <p className="text-xs text-slate-400 leading-relaxed">
-                        Esses dados são usados somente para processar o PIX e não aparecem na página pública do presente.
-                      </p>
-                    </div>
-                  </div>
+                  <CheckoutTrust />
+                  <p className="text-[11px] text-slate-500 text-center">
+                    Ao continuar, você declara que leu os <a href="/termos" target="_blank" className="underline hover:text-slate-300">Termos de uso</a> e a <a href="/privacidade" target="_blank" className="underline hover:text-slate-300">Política de privacidade</a>.
+                  </p>
 
                   {paymentDataError && (
                     <p role="alert" className="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
