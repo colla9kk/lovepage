@@ -1,6 +1,6 @@
 # LovePage
 
-Página romântica personalizada com pagamento único de R$ 19,90 via PIX. Frontend Next.js; backend Express/Prisma; SQLite local e PostgreSQL em produção.
+Página romântica personalizada com pagamento único de R$ 19,90 via PIX, temas visuais, álbum, música, métricas e painel administrativo. Frontend Next.js; backend Express/Prisma; SQLite local e PostgreSQL em produção.
 
 ## Antes de usar pagamentos reais
 
@@ -50,6 +50,7 @@ Abra `http://localhost:3000`.
 | Backend | `PORT` | Porta HTTP, padrão 5000 |
 | Backend | `PRICE_CENTS` | Preço do PIX em centavos; padrão `1990` |
 | Backend | `TRUST_PROXY_HOPS` | Quantidade exata de proxies confiáveis entre cliente e backend; 0 no acesso direto |
+| Backend | `ADMIN_PASSWORD` | Senha forte do painel privado em `/admin`; fica somente no backend |
 | Frontend | `NEXT_PUBLIC_API_URL` | Origem do backend; precisa estar definida **antes do build** |
 | Frontend | `NEXT_PUBLIC_PRICE_CENTS` | Preço exibido no frontend em centavos; mantenha igual a `PRICE_CENTS` |
 
@@ -73,6 +74,8 @@ O polling é sequencial, com intervalo de 3 segundos, timeout e interrupção em
 - `POST /api/checkout/pix`: corpo com `orderId`, `email`, `cpf`, `nomeCasal`, `dataInicio`, `mensagem`, `fotoUrl`, `spotifyTrackId`; cabeçalho `Authorization: Bearer <chave de recuperação>`.
 - `GET /api/checkout/orders/:orderId`: mesmo cabeçalho; retorna status, PIX, dados do presente e resultado quando entregue.
 - `POST /api/webhooks/mercadopago`: assinatura `x-signature`, `x-request-id` e ID em `data.id` na query; configure notificações de pagamentos da aplicação.
+- `POST /api/metrics`: registra somente eventos anônimos do funil (visita, clique, abertura e compartilhamento).
+- `GET /api/admin/dashboard`: painel privado autenticado por `ADMIN_PASSWORD`; não retorna CPF nem e-mail.
 - `GET /api/pages/:slug`: somente dados públicos da página.
 - `GET /health`: verifica conexão com o banco.
 - As antigas rotas de criação direta de páginas e consulta pública de paymentId retornam HTTP 410.
