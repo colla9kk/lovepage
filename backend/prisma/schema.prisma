@@ -16,6 +16,7 @@ model Page {
   fotoUrl        String
   spotifyTrackId String?
   theme          String   @default("romantic")
+  extraData      String?
   createdAt      DateTime @default(now())
   orderId        String?  @unique
   order          Order?   @relation(fields: [orderId], references: [id])
