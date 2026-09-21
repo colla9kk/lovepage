@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '@/lib/api';
+import { trackMetric } from '@/lib/metrics';
 import { Heart, Sparkles, MessageCircle, Music, Play, ChevronLeft, ChevronRight } from 'lucide-react';
 
 function ChuvaDeCoracoes() {
@@ -58,7 +59,7 @@ function ChuvaDeCoracoes() {
 
 export default function GiftPageClient({ slug }: { slug: string }) {
 
-  const [pagina, setPagina] = useState<{ nomeCasal: string; dataInicio: string; mensagem: string; fotoUrl: string; fotoUrls?: string[]; spotifyTrackId?: string } | null>(null);
+  const [pagina, setPagina] = useState<{ nomeCasal: string; dataInicio: string; mensagem: string; fotoUrl: string; fotoUrls?: string[]; spotifyTrackId?: string; theme?: 'romantic' | 'midnight' | 'minimal' } | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState(false);
   const [tempo, setTempo] = useState({ dias: 0, horas: 0, minutos: 0, segundos: 0 });
@@ -67,6 +68,11 @@ export default function GiftPageClient({ slug }: { slug: string }) {
 
   useEffect(() => {
     if (!slug) return;
+    const key = `lovepage.metric.page_view.${slug}`;
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1');
+      trackMetric('page_view', { pageSlug: slug });
+    }
     fetch(`${API_URL}/api/pages/${encodeURIComponent(slug)}`)
       .then((res) => {
         if (!res.ok) throw new Error('Não encontrada');
@@ -103,6 +109,33 @@ export default function GiftPageClient({ slug }: { slug: string }) {
   }, [pagina]);
 
   const fotos = pagina?.fotoUrls?.length ? pagina.fotoUrls : pagina?.fotoUrl ? [pagina.fotoUrl] : [];
+  const theme = pagina?.theme || 'romantic';
+  const visual = {
+    romantic: {
+      page: 'bg-slate-950',
+      card: 'bg-slate-900/90 border-slate-800',
+      accent: 'text-rose-400',
+      soft: 'text-rose-300',
+      button: 'bg-rose-600 hover:bg-rose-500',
+      timerBorder: 'border-rose-500/20',
+    },
+    midnight: {
+      page: 'bg-[#090714]',
+      card: 'bg-[#131022]/95 border-violet-900/60',
+      accent: 'text-violet-300',
+      soft: 'text-fuchsia-300',
+      button: 'bg-violet-600 hover:bg-violet-500',
+      timerBorder: 'border-violet-500/20',
+    },
+    minimal: {
+      page: 'bg-zinc-950',
+      card: 'bg-zinc-900/95 border-zinc-700',
+      accent: 'text-zinc-100',
+      soft: 'text-zinc-300',
+      button: 'bg-zinc-100 hover:bg-white text-zinc-950',
+      timerBorder: 'border-zinc-700',
+    },
+  }[theme];
 
   useEffect(() => {
     if (fotos.length <= 1) return;
@@ -111,6 +144,7 @@ export default function GiftPageClient({ slug }: { slug: string }) {
   }, [fotos.length]);
 
   const compartilharWhatsApp = () => {
+    trackMetric('whatsapp_share', { pageSlug: slug });
     const texto = `💖 Fiz uma surpresa especial para você: ${pagina?.nomeCasal || 'LovePage'}\n${window.location.href}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank', 'noopener,noreferrer');
   };
@@ -136,10 +170,10 @@ export default function GiftPageClient({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-x-hidden">
+    <div className={`min-h-screen text-white flex flex-col items-center justify-center p-4 font-sans relative overflow-x-hidden ${visual.page}`}>
       <ChuvaDeCoracoes />
 
-      <div className="w-full max-w-md bg-slate-900/90 backdrop-blur border border-slate-800 rounded-3xl p-6 text-center shadow-2xl space-y-6 my-8 relative z-20">
+      <div className={`w-full max-w-md backdrop-blur border rounded-3xl p-6 text-center shadow-2xl space-y-6 my-8 relative z-20 ${visual.card}`}>
         {pagina.spotifyTrackId && !musicaRevelada && (
           <button
             type="button"
@@ -149,7 +183,7 @@ export default function GiftPageClient({ slug }: { slug: string }) {
             <div className="w-14 h-14 mx-auto rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-950/50 group-hover:scale-110 transition">
               <Play size={24} className="fill-white ml-1" />
             </div>
-            <div className="mt-3 flex items-center justify-center gap-2 text-rose-300 font-semibold">
+            <div className={`mt-3 flex items-center justify-center gap-2 font-semibold ${visual.soft}`}>
               <Music size={18} />
               Tem uma música para você
             </div>
@@ -159,7 +193,7 @@ export default function GiftPageClient({ slug }: { slug: string }) {
 
         {pagina.spotifyTrackId && musicaRevelada && (
           <div className="space-y-2 animate-fade-in">
-            <div className="flex items-center justify-center gap-2 text-sm text-rose-300 font-medium">
+            <div className={`flex items-center justify-center gap-2 text-sm font-medium ${visual.soft}`}>
               <Music size={16} /> A música de vocês 💖
             </div>
             <div className="w-full rounded-2xl overflow-hidden shadow-md border border-slate-700">
@@ -224,12 +258,12 @@ export default function GiftPageClient({ slug }: { slug: string }) {
           )}
         </div>
 
-        <h1 className="text-3xl font-bold text-rose-400 flex items-center justify-center gap-2">
+        <h1 className={`text-3xl font-bold flex items-center justify-center gap-2 ${visual.accent}`}>
           <Sparkles className="text-amber-400" size={24} />
           {pagina.nomeCasal}
         </h1>
 
-        <div className="bg-slate-950 border border-rose-500/20 rounded-2xl p-4 shadow-inner">
+        <div className={`bg-slate-950 border rounded-2xl p-4 shadow-inner ${visual.timerBorder}`}>
           <p className="text-xs uppercase tracking-wider text-slate-400 mb-3">Juntos Há</p>
           <div className="grid grid-cols-4 gap-2 text-center">
             <div className="bg-slate-900 p-3 rounded-xl border border-slate-800"><span className="block text-2xl font-bold text-rose-400">{tempo.dias}</span><span className="text-xs text-slate-400">Dias</span></div>
@@ -246,7 +280,7 @@ export default function GiftPageClient({ slug }: { slug: string }) {
         <button
           type="button"
           onClick={compartilharWhatsApp}
-          className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg"
+          className={`w-full font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg ${visual.button}`}
         >
           <MessageCircle size={20} />
           Compartilhar no WhatsApp
