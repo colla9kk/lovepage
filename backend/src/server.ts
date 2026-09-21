@@ -35,7 +35,14 @@ const { app, checkout } = createApp(prisma, {
     throw error;
   }
   },
-}, { frontendUrl, collectorId: required('MERCADO_PAGO_COLLECTOR_ID'), webhookSecret, trustProxy: Number(process.env.TRUST_PROXY_HOPS || 0), priceCents });
+}, {
+  frontendUrl,
+  collectorId: required('MERCADO_PAGO_COLLECTOR_ID'),
+  webhookSecret,
+  trustProxy: Number(process.env.TRUST_PROXY_HOPS || 0),
+  priceCents,
+  adminPassword: process.env.ADMIN_PASSWORD?.trim() || '',
+});
 let reconciling = false;
 const timer = setInterval(async () => {
   if (reconciling) return;
