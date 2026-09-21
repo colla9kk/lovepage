@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '@/lib/api';
-import { Heart, Sparkles, MessageCircle } from 'lucide-react';
+import { Heart, Sparkles, MessageCircle, Music, Play, ChevronLeft, ChevronRight } from 'lucide-react';
 
 function ChuvaDeCoracoes() {
   // Deterministic positions keep server rendering and hydration identical.
@@ -58,10 +58,12 @@ function ChuvaDeCoracoes() {
 
 export default function GiftPageClient({ slug }: { slug: string }) {
 
-  const [pagina, setPagina] = useState<{ nomeCasal: string; dataInicio: string; mensagem: string; fotoUrl: string; spotifyTrackId?: string } | null>(null);
+  const [pagina, setPagina] = useState<{ nomeCasal: string; dataInicio: string; mensagem: string; fotoUrl: string; fotoUrls?: string[]; spotifyTrackId?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState(false);
   const [tempo, setTempo] = useState({ dias: 0, horas: 0, minutos: 0, segundos: 0 });
+  const [musicaRevelada, setMusicaRevelada] = useState(false);
+  const [fotoAtual, setFotoAtual] = useState(0);
 
   useEffect(() => {
     if (!slug) return;
@@ -100,6 +102,14 @@ export default function GiftPageClient({ slug }: { slug: string }) {
     return () => clearInterval(interval);
   }, [pagina]);
 
+  const fotos = pagina?.fotoUrls?.length ? pagina.fotoUrls : pagina?.fotoUrl ? [pagina.fotoUrl] : [];
+
+  useEffect(() => {
+    if (fotos.length <= 1) return;
+    const interval = setInterval(() => setFotoAtual(index => (index + 1) % fotos.length), 4500);
+    return () => clearInterval(interval);
+  }, [fotos.length]);
+
   const compartilharWhatsApp = () => {
     const texto = `💖 Fiz uma surpresa especial para você: ${pagina?.nomeCasal || 'LovePage'}\n${window.location.href}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank', 'noopener,noreferrer');
@@ -130,21 +140,88 @@ export default function GiftPageClient({ slug }: { slug: string }) {
       <ChuvaDeCoracoes />
 
       <div className="w-full max-w-md bg-slate-900/90 backdrop-blur border border-slate-800 rounded-3xl p-6 text-center shadow-2xl space-y-6 my-8 relative z-20">
-        {pagina.spotifyTrackId && (
-          <div className="w-full rounded-2xl overflow-hidden shadow-md">
-            <iframe
-              src={`https://open.spotify.com/embed/track/${pagina.spotifyTrackId}?utm_source=generator&theme=0`}
-              width="100%"
-              height="80"
-              frameBorder="0"
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="lazy"
-            ></iframe>
+        {pagina.spotifyTrackId && !musicaRevelada && (
+          <button
+            type="button"
+            onClick={() => setMusicaRevelada(true)}
+            className="w-full group bg-gradient-to-br from-rose-500/15 to-fuchsia-500/10 hover:from-rose-500/25 hover:to-fuchsia-500/20 border border-rose-500/30 rounded-2xl p-5 transition shadow-lg"
+          >
+            <div className="w-14 h-14 mx-auto rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-950/50 group-hover:scale-110 transition">
+              <Play size={24} className="fill-white ml-1" />
+            </div>
+            <div className="mt-3 flex items-center justify-center gap-2 text-rose-300 font-semibold">
+              <Music size={18} />
+              Tem uma música para você
+            </div>
+            <p className="text-xs text-slate-400 mt-1">Toque para revelar a música de vocês 🎵</p>
+          </button>
+        )}
+
+        {pagina.spotifyTrackId && musicaRevelada && (
+          <div className="space-y-2 animate-fade-in">
+            <div className="flex items-center justify-center gap-2 text-sm text-rose-300 font-medium">
+              <Music size={16} /> A música de vocês 💖
+            </div>
+            <div className="w-full rounded-2xl overflow-hidden shadow-md border border-slate-700">
+              <iframe
+                src={`https://open.spotify.com/embed/track/${pagina.spotifyTrackId}?utm_source=generator&theme=0&autoplay=1`}
+                width="100%"
+                height="152"
+                frameBorder="0"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+              ></iframe>
+            </div>
+            <p className="text-[11px] text-slate-500">Se o navegador não iniciar sozinho, toque no play do Spotify.</p>
           </div>
         )}
 
-        <div className="relative w-52 h-64 mx-auto rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl">
-          <img src={pagina.fotoUrl || 'https://via.placeholder.com/300'} alt="Casal" className="w-full h-full object-cover" />
+        <div className="space-y-3">
+          <div className="relative w-full max-w-sm aspect-[4/5] mx-auto rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl bg-slate-950">
+            <img
+              src={fotos[fotoAtual] || pagina.fotoUrl || 'https://via.placeholder.com/300'}
+              alt={`Memória ${fotoAtual + 1} de ${pagina.nomeCasal}`}
+              className="w-full h-full object-cover transition duration-500"
+            />
+            {fotos.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setFotoAtual(index => (index - 1 + fotos.length) % fotos.length)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white flex items-center justify-center backdrop-blur"
+                  aria-label="Foto anterior"
+                >
+                  <ChevronLeft size={22} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFotoAtual(index => (index + 1) % fotos.length)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white flex items-center justify-center backdrop-blur"
+                  aria-label="Próxima foto"
+                >
+                  <ChevronRight size={22} />
+                </button>
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-950/70 backdrop-blur px-3 py-1 rounded-full text-xs text-white">
+                  {fotoAtual + 1} / {fotos.length}
+                </div>
+              </>
+            )}
+          </div>
+          {fotos.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-1 justify-start">
+              {fotos.map((foto, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setFotoAtual(index)}
+                  className={`w-14 h-14 shrink-0 rounded-lg overflow-hidden border-2 transition ${index === fotoAtual ? 'border-rose-500 scale-105' : 'border-slate-700 opacity-70 hover:opacity-100'}`}
+                  aria-label={`Ver foto ${index + 1}`}
+                >
+                  <img src={foto} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <h1 className="text-3xl font-bold text-rose-400 flex items-center justify-center gap-2">
