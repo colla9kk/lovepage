@@ -216,8 +216,14 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get('promo')?.trim() || '';
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('promo')?.trim() || '';
+    const model = params.get('modelo');
     setPromoCode(code);
+    if (model === 'romantic' || model === 'friend' || model === 'family') {
+      setThemeInput(model);
+      window.setTimeout(() => document.getElementById('criar')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+    }
   }, []);
 
   useEffect(() => {
@@ -425,6 +431,72 @@ export default function Home() {
             <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><b className="block text-white">1.</b><span className="text-xs text-slate-400">Personalize</span></div>
             <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><b className="block text-white">2.</b><span className="text-xs text-slate-400">Pague no PIX</span></div>
             <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><b className="block text-white">3.</b><span className="text-xs text-slate-400">Envie o link</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="w-full px-6 py-12 border-b border-slate-800/70 bg-slate-950">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto">
+            <p className="text-rose-400 text-xs font-bold uppercase tracking-[0.2em]">Veja antes de criar</p>
+            <h2 className="text-3xl md:text-4xl font-black mt-2">Escolha o tipo de presente</h2>
+            <p className="text-slate-400 mt-3">Abra um exemplo pronto. Cada modelo tem estrutura, textos e clima próprios.</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4 mt-8">
+            <article className="rounded-3xl border border-rose-500/20 bg-gradient-to-b from-rose-500/10 to-slate-900 p-5 flex flex-col">
+              <div className="text-3xl">❤️</div>
+              <h3 className="text-xl font-bold mt-4">Para namorado(a)</h3>
+              <p className="text-sm text-slate-400 mt-2 flex-1">Contador do relacionamento, fotos do casal, carta e música revelada.</p>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <a href="/demo/romantic" target="_blank" rel="noreferrer" className="border border-rose-500/30 hover:border-rose-400 text-rose-200 text-center font-semibold py-2.5 rounded-xl text-sm transition">
+                  Ver exemplo
+                </a>
+                <button
+                  type="button"
+                  onClick={() => { setThemeInput('romantic'); document.getElementById('criar')?.scrollIntoView({ behavior: 'smooth' }); }}
+                  className="bg-rose-600 hover:bg-rose-500 text-white font-semibold py-2.5 rounded-xl text-sm transition"
+                >
+                  Escolher
+                </button>
+              </div>
+            </article>
+
+            <article className="rounded-3xl border border-cyan-500/20 bg-gradient-to-b from-cyan-500/10 to-slate-900 p-5 flex flex-col">
+              <div className="text-3xl">🤝</div>
+              <h3 className="text-xl font-bold mt-4">Para amigo(a)</h3>
+              <p className="text-sm text-slate-400 mt-2 flex-1">Polaroid, resenhas, memórias marcantes e uma mensagem com mais personalidade.</p>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <a href="/demo/friend" target="_blank" rel="noreferrer" className="border border-cyan-500/30 hover:border-cyan-400 text-cyan-200 text-center font-semibold py-2.5 rounded-xl text-sm transition">
+                  Ver exemplo
+                </a>
+                <button
+                  type="button"
+                  onClick={() => { setThemeInput('friend'); document.getElementById('criar')?.scrollIntoView({ behavior: 'smooth' }); }}
+                  className="bg-cyan-300 hover:bg-cyan-200 text-slate-950 font-bold py-2.5 rounded-xl text-sm transition"
+                >
+                  Escolher
+                </button>
+              </div>
+            </article>
+
+            <article className="rounded-3xl border border-amber-500/20 bg-gradient-to-b from-amber-500/10 to-slate-900 p-5 flex flex-col">
+              <div className="text-3xl">🏡</div>
+              <h3 className="text-xl font-bold mt-4">Para família</h3>
+              <p className="text-sm text-slate-400 mt-2 flex-1">Uma homenagem acolhedora com lembranças, gratidão, fotos e mensagem especial.</p>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <a href="/demo/family" target="_blank" rel="noreferrer" className="border border-amber-500/30 hover:border-amber-400 text-amber-200 text-center font-semibold py-2.5 rounded-xl text-sm transition">
+                  Ver exemplo
+                </a>
+                <button
+                  type="button"
+                  onClick={() => { setThemeInput('family'); document.getElementById('criar')?.scrollIntoView({ behavior: 'smooth' }); }}
+                  className="bg-amber-200 hover:bg-amber-100 text-amber-950 font-bold py-2.5 rounded-xl text-sm transition"
+                >
+                  Escolher
+                </button>
+              </div>
+            </article>
           </div>
         </div>
       </section>
