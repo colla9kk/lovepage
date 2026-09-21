@@ -306,10 +306,10 @@ export default function Home() {
   const iniciarCheckout = async () => {
     if (!payment.session) {
       const cpfDigits = cpf.replace(/\D/g, '');
-      if (!nomeCasal.trim()) { setFormError('Coloque o nome do casal.'); return; }
-      if (!dataInicio) { setFormError('Escolha a data de início do casal.'); return; }
+      if (!nomeCasal.trim()) { setFormError(`Preencha: ${templateCopy.nameLabel.toLowerCase()}.`); return; }
+      if (template === 'romantic' && !dataInicio) { setFormError('Escolha a data de início do casal.'); return; }
       if (!mensagem.trim()) { setFormError('Escreva uma mensagem para a pessoa.'); return; }
-      if (!fotoUrlsInput.length) { setFormError('Adicione pelo menos uma foto do casal.'); return; }
+      if (!fotoUrlsInput.length) { setFormError('Adicione pelo menos uma foto.'); return; }
       if (spotifyTrackIdInput.trim() && !spotifyTrackIdFromInput(spotifyTrackIdInput)) {
         setFormError('Cole um link válido de uma música do Spotify.');
         return;
@@ -328,7 +328,9 @@ export default function Home() {
       fotoUrl,
       fotoUrls,
       spotifyTrackId,
-      theme,
+      theme: template,
+      relationLabel,
+      highlights: highlightsInput.map(item => item.trim()).filter(Boolean),
       email,
       cpf,
       ...(promoAvailable && promoCode ? { promoCode } : {}),
@@ -370,7 +372,13 @@ export default function Home() {
     setFotoUrls(fotoUrls);
     setPreviewPhotoIndex(0);
     setSpotifyTrackId(spotifyTrackId);
-    setThemeInput(theme);
+    setThemeInput(template);
+    setRelationLabel(relationLabel);
+    setHighlights([
+      highlights[0] || '',
+      highlights[1] || '',
+      highlights[2] || '',
+    ]);
 
     const cancelled = await payment.cancelPending();
     if (cancelled) {
