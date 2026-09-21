@@ -26,6 +26,7 @@ export const pageInput = z.object({
   }, 'Informe uma data válida, não futura.'),
   mensagem: z.string().trim().min(1).max(10000),
   fotoUrl: photo,
+  fotoUrls: z.array(photo).min(1).max(10, 'Envie no máximo 10 fotos.').optional(),
   spotifyTrackId: z.string().trim().regex(/^$|^[a-zA-Z0-9]{22}$/).optional().default(''),
 });
 export const checkoutInput = pageInput.extend({
