@@ -99,7 +99,9 @@ export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: {
 
   async function cancel(id: string, token: string) {
     let order = authorize(await prisma.order.findUnique({ where: { id } }), token);
-    if (order.page || order.status === 'approved') throw new HttpError(409, 'Este pagamento já foi aprovado e o presente já está sendo entregue.');
+    if (await prisma.page.findUnique({ where: { orderId: order.id } }) || order.status === 'approved') {
+      throw new HttpError(409, 'Este pagamento já foi aprovado e o presente já está sendo entregue.');
+    }
     if (['cancelled', 'rejected', 'refunded', 'charged_back'].includes(order.status)) {
       return { orderId: order.id, status: order.status };
     }
@@ -109,7 +111,9 @@ export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: {
     if (!order.paymentId) {
       await sync(order);
       order = authorize(await prisma.order.findUnique({ where: { id } }), token);
-      if (order.page || order.status === 'approved') throw new HttpError(409, 'Este pagamento já foi aprovado e não pode mais ser cancelado.');
+      if (await prisma.page.findUnique({ where: { orderId: order.id } }) || order.status === 'approved') {
+        throw new HttpError(409, 'Este pagamento já foi aprovado e não pode mais ser cancelado.');
+      }
     }
 
     if (order.paymentId) {
