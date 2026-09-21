@@ -5,6 +5,7 @@ import GiftPageClient from './GiftPageClient';
 type GiftPageData = {
   nomeCasal: string;
   fotoUrl: string;
+  theme?: 'romantic' | 'friend' | 'family' | 'midnight' | 'minimal';
 };
 
 type Props = {
@@ -36,7 +37,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const title = `${gift.nomeCasal} ❤️ | LovePage`;
-  const description = 'Uma surpresa especial feita com amor. Abra para ver o presente completo 💖';
+  const description = gift.theme === 'friend'
+    ? 'Uma página especial feita para celebrar uma amizade inesquecível. Abra para ver o presente completo 🤝'
+    : gift.theme === 'family'
+      ? 'Uma homenagem especial feita com carinho para alguém da família. Abra para ver o presente completo 🏡'
+      : 'Uma surpresa especial feita com amor. Abra para ver o presente completo 💖';
   const imageUrl = `${API_URL}/api/pages/${encodeURIComponent(slug)}/photo`;
 
   return {
