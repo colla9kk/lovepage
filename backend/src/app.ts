@@ -24,6 +24,9 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: { fron
   app.get('/api/checkout/orders/:orderId', async (req, res) => {
     res.json({ success: true, ...await checkout.get(req.params.orderId, token(req)) });
   });
+  app.post('/api/checkout/orders/:orderId/cancel', async (req, res) => {
+    res.json({ success: true, ...await checkout.cancel(req.params.orderId, token(req)) });
+  });
   app.post('/api/pages', (_req, res) => { res.status(410).json({ error: 'A página é criada automaticamente após a confirmação do pedido.' }); });
   app.get('/api/checkout/status/:paymentId', (_req, res) => { res.status(410).json({ error: 'Utilize a consulta autenticada do pedido.' }); });
   app.get('/api/pages/:slug', async (req, res) => {
