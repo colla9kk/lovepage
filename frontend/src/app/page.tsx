@@ -165,6 +165,11 @@ export default function Home() {
   const theme = payment.checkout?.pageData?.theme ?? themeInput;
   const previewNomeCasal = nomeCasal || 'Seu Amor & Você';
   const previewMensagem = mensagem || 'Sua mensagem especial vai aparecer aqui...';
+  const themePreview = {
+    romantic: { shell: 'bg-slate-950 border-slate-800', accent: 'text-rose-400', label: 'Romântico' },
+    midnight: { shell: 'bg-zinc-950 border-violet-900/60', accent: 'text-violet-300', label: 'Midnight' },
+    minimal: { shell: 'bg-slate-950 border-slate-600', accent: 'text-slate-100', label: 'Minimal' },
+  }[theme];
 
   useEffect(() => {
     const key = 'lovepage.metric.landing_view';
@@ -355,7 +360,32 @@ export default function Home() {
         </button>
       </header>
 
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 max-w-7xl mx-auto w-full">
+      <section className="w-full border-b border-slate-800/70 bg-gradient-to-b from-rose-950/20 to-slate-950 px-6 py-12 md:py-16">
+        <div className="max-w-5xl mx-auto text-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-300">
+            <Heart size={13} className="fill-rose-400" /> presente digital pronto em poucos minutos
+          </span>
+          <h1 className="mt-5 text-4xl md:text-6xl font-black tracking-tight text-white">
+            Transforme a história de vocês em uma página só do casal.
+          </h1>
+          <p className="max-w-2xl mx-auto mt-4 text-slate-300 md:text-lg">
+            Fotos, música do Spotify, contador do relacionamento e uma carta especial em um link para enviar no WhatsApp.
+          </p>
+          <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a href="#criar" className="w-full sm:w-auto bg-rose-600 hover:bg-rose-500 text-white font-bold px-7 py-3.5 rounded-xl shadow-lg shadow-rose-950 transition">
+              Criar minha LovePage por {priceLabel}
+            </a>
+            <span className="text-xs text-slate-500">Pagamento único via PIX • até 10 fotos</span>
+          </div>
+          <div className="mt-8 grid grid-cols-3 gap-3 max-w-xl mx-auto">
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><b className="block text-white">1.</b><span className="text-xs text-slate-400">Personalize</span></div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><b className="block text-white">2.</b><span className="text-xs text-slate-400">Pague no PIX</span></div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><b className="block text-white">3.</b><span className="text-xs text-slate-400">Envie o link</span></div>
+          </div>
+        </div>
+      </section>
+
+      <main id="criar" className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 max-w-7xl mx-auto w-full">
         {/* Lado Esquerdo: Formulário */}
         <section className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6 h-fit">
           <div className="border-b border-slate-800 pb-4">
@@ -385,6 +415,29 @@ export default function Home() {
                 <Calendar size={16} /> Data do Início
               </label>
               <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                <Palette size={16} /> Estilo da página
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  ['romantic', 'Romântico', 'Rosa clássico'],
+                  ['midnight', 'Midnight', 'Roxo escuro'],
+                  ['minimal', 'Minimal', 'Limpo e neutro'],
+                ] as const).map(([value, label, hint]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setThemeInput(value)}
+                    className={`rounded-xl border p-3 text-left transition ${theme === value ? 'border-rose-500 bg-rose-500/10' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}
+                  >
+                    <span className="block text-sm font-semibold">{label}</span>
+                    <span className="block text-[10px] text-slate-500 mt-1">{hint}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>
@@ -449,10 +502,12 @@ export default function Home() {
                 <p className="text-[11px] text-slate-500">Ou use uma URL HTTPS como primeira foto:</p>
                 <input
                   type="text"
-                  value={fotoUrl.startsWith('data:') ? '' : fotoUrl}
+                  value={fotoUrlsInput[0]?.startsWith('data:') ? '' : (fotoUrlsInput[0] || '')}
                   onChange={(e) => setFotoUrls(previous => {
+                    const value = e.target.value.trim();
+                    if (!value) return previous.slice(1);
                     const next = [...previous];
-                    next[0] = e.target.value || DEFAULT_PHOTO;
+                    next[0] = value;
                     return next;
                   })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
@@ -472,7 +527,7 @@ export default function Home() {
             </div>
             <div>
               <label htmlFor="payer-cpf" className="block text-sm font-medium text-slate-300 mb-1">Seu CPF</label>
-              <input id="payer-cpf" inputMode="numeric" maxLength={14} value={cpf} onChange={e => setCpf(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3" />
+              <input id="payer-cpf" inputMode="numeric" maxLength={14} value={cpf} onChange={e => setCpf(formatCpf(e.target.value))} placeholder="000.000.000-00" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3" />
               <p className="text-xs text-slate-400 mt-2">Dados do comprador para processar o PIX. Não aparecem na página pública.</p>
             </div>
           </fieldset>
@@ -487,6 +542,7 @@ export default function Home() {
               Corrigir dados / gerar novo PIX
             </button>
           )}
+          {formError && <p role="alert" className="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">{formError}</p>}
           {payment.error && <p role="alert" className="text-sm text-amber-300">{payment.error}</p>}
           {(resultado || payment.terminal) && <button onClick={payment.reset} className="text-rose-300 underline">Criar outro presente</button>}
             <button
@@ -526,6 +582,13 @@ export default function Home() {
                 </a>
 
                 <button
+                  onClick={compartilharResultado}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-lg text-xs flex items-center justify-center gap-2 transition"
+                >
+                  <MessageCircle size={15} /> Enviar no WhatsApp
+                </button>
+
+                <button
                   onClick={copiarLink}
                   className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 rounded-lg text-xs flex items-center justify-center gap-2 transition border border-slate-700"
                 >
@@ -544,7 +607,8 @@ export default function Home() {
             <Clock size={16} /> Prévia da página em tempo real:
           </div>
 
-          <div className="w-full max-w-[360px] h-[680px] bg-slate-950 border-[8px] border-slate-800 rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col p-4 text-center text-white">
+          <div className={`w-full max-w-[360px] h-[680px] border-[8px] rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col p-4 text-center text-white ${themePreview.shell}`}>
+            <div className="absolute top-2 right-5 z-30 text-[9px] uppercase tracking-widest bg-black/40 border border-white/10 px-2 py-1 rounded-full text-slate-300">{themePreview.label}</div>
             <ChuvaDeCoracoes />
 
             <div className="relative z-20 flex flex-col h-full overflow-y-auto space-y-4 pr-1">
@@ -600,7 +664,7 @@ export default function Home() {
                 )}
               </div>
 
-              <h2 className="text-2xl font-bold text-rose-400">{nomeCasal || 'Seus Nomes'}</h2>
+              <h2 className={`text-2xl font-bold ${themePreview.accent}`}>{previewNomeCasal}</h2>
 
               <div className="bg-slate-900/90 border border-rose-500/20 rounded-xl p-3 shadow-inner">
                 <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-2">Juntos Há</p>
@@ -613,7 +677,7 @@ export default function Home() {
               </div>
 
               <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 text-slate-300 text-xs whitespace-pre-line text-left leading-relaxed">
-                {mensagem || 'Sua mensagem aparecerá aqui...'}
+                {previewMensagem}
               </div>
 
               <div className="pt-2 pb-4 flex justify-center text-rose-500/80 shrink-0">
