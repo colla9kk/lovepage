@@ -67,12 +67,21 @@ export function createCheckout(prisma: PrismaClient, gateway: Gateway, config: {
     await prisma.order.update({ where: { id: order.id }, data: { paymentId: String(info.id), status: info.status || 'pending' } });
     if (info.status === 'approved') {
       const payload = pageInput.parse(JSON.parse(order.payload));
+      const photos = payload.fotoUrls?.length ? payload.fotoUrls : [payload.fotoUrl];
       const base = payload.nomeCasal.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'casal';
       try {
         await prisma.$transaction(async tx => {
           await tx.page.upsert({
             where: { orderId: order.id }, update: {},
-            create: { ...payload, orderId: order.id, slug: `${base}-${randomUUID()}` },
+            create: {
+              nomeCasal: payload.nomeCasal,
+              dataInicio: payload.dataInicio,
+              mensagem: payload.mensagem,
+              fotoUrl: photos.length === 1 ? photos[0] : JSON.stringify(photos),
+              spotifyTrackId: payload.spotifyTrackId,
+              orderId: order.id,
+              slug: `${base}-${randomUUID()}`,
+            },
           });
           // The provider no longer needs payer details after payment approval.
           await tx.order.update({ where: { id: order.id }, data: { payerCpf: '', payerEmail: '' } });
