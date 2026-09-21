@@ -12,10 +12,19 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: { fron
   app.disable('x-powered-by');
   if (config.trustProxy) app.set('trust proxy', config.trustProxy);
   app.use(cors({ origin: config.frontendUrl, allowedHeaders: ['Content-Type', 'Authorization'] }));
-  app.use(express.json({ limit: '8mb' }));
+  app.use(express.json({ limit: '16mb' }));
   app.use('/api/checkout', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
   app.use('/api/checkout', rateLimit({ windowMs: 60000, limit: 90, standardHeaders: 'draft-7', legacyHeaders: false }));
   const token = (req: express.Request) => req.get('authorization')?.replace(/^Bearer /, '') || '';
+  const photosFromStoredValue = (value: string) => {
+    if (!value.startsWith('[')) return [value];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) && parsed.every(item => typeof item === 'string') && parsed.length ? parsed.slice(0, 10) : [value];
+    } catch {
+      return [value];
+    }
+  };
   app.get('/health', async (_req, res) => { await prisma.$queryRaw`SELECT 1`; res.json({ ok: true }); });
   app.post('/api/checkout/pix', rateLimit({ windowMs: 60000, limit: config.checkoutLimit ?? 10 }), async (req, res) => {
     const order = await checkout.save(checkoutInput.parse(req.body), token(req));
@@ -34,19 +43,21 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: { fron
       nomeCasal: true, dataInicio: true, mensagem: true, fotoUrl: true, spotifyTrackId: true, slug: true,
     } });
     if (!page) { res.status(404).json({ error: 'Página não encontrada.' }); return; }
-    res.json(page);
+    const fotoUrls = photosFromStoredValue(page.fotoUrl);
+    res.json({ ...page, fotoUrl: fotoUrls[0], fotoUrls });
   });
   app.get('/api/pages/:slug/photo', async (req, res) => {
     const page = await prisma.page.findUnique({ where: { slug: req.params.slug }, select: { fotoUrl: true } });
     if (!page) { res.status(404).end(); return; }
 
-    const dataImage = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(page.fotoUrl);
+    const firstPhoto = photosFromStoredValue(page.fotoUrl)[0];
+    const dataImage = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(firstPhoto);
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     if (dataImage) {
       res.type(dataImage[1]).send(Buffer.from(dataImage[2], 'base64'));
       return;
     }
-    res.redirect(302, page.fotoUrl);
+    res.redirect(302, firstPhoto);
   });
   app.post('/api/webhooks/mercadopago', async (req, res) => {
     const id = typeof req.query['data.id'] === 'string' ? req.query['data.id'] : '';
@@ -63,7 +74,7 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: { fron
   const errors: ErrorRequestHandler = (error, _req, res, _next) => {
     if (error instanceof ZodError) { res.status(400).json({ error: error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(' ') }); return; }
     if (error instanceof HttpError) { res.status(error.status).json({ error: error.message }); return; }
-    if (error.type === 'entity.too.large') { res.status(413).json({ error: 'Imagem muito grande. Limite: 5 MB.' }); return; }
+    if (error.type === 'entity.too.large') { res.status(413).json({ error: 'As fotos ficaram grandes demais. Tente imagens menores ou em menor quantidade.' }); return; }
     if (error.type === 'entity.parse.failed') { res.status(400).json({ error: 'JSON inválido.' }); return; }
     console.error('Falha ao processar pedido:', error instanceof Error ? error.name : 'GatewayError');
     res.status(503).json({ error: 'Não foi possível concluir agora. Seu pedido pode ser recuperado; tente novamente.' });
