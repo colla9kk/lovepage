@@ -139,6 +139,7 @@ export default function Home() {
   const [relationLabelInput, setRelationLabel] = useState('');
   const [highlightsInput, setHighlights] = useState<string[]>(['', '', '']);
   const [formError, setFormError] = useState('');
+  const [paymentDataError, setPaymentDataError] = useState('');
 
   const [tempo, setTempo] = useState({ dias: 0, horas: 0, minutos: 0, segundos: 0 });
   const [email, setEmail] = useState('');
@@ -309,9 +310,8 @@ export default function Home() {
     setPreviewPhotoIndex(0);
   };
 
-  const iniciarCheckout = async () => {
+  const iniciarCheckout = () => {
     if (!payment.session) {
-      const cpfDigits = cpf.replace(/\D/g, '');
       if (!nomeCasal.trim()) { setFormError(`Preencha: ${templateCopy.nameLabel.toLowerCase()}.`); return; }
       if (template === 'romantic' && !dataInicio) { setFormError('Escolha a data de início do casal.'); return; }
       if (!mensagem.trim()) { setFormError('Escreva uma mensagem para a pessoa.'); return; }
@@ -320,14 +320,27 @@ export default function Home() {
         setFormError('Cole um link válido de uma música do Spotify.');
         return;
       }
-      if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setFormError('Coloque um e-mail válido.'); return; }
-      if (cpfDigits.length !== 11) { setFormError('Confira o CPF antes de gerar o PIX.'); return; }
       setFormError('');
-      trackMetric('checkout_click');
+      setPaymentDataError('');
+    }
+    setModalPixOpen(true);
+  };
+
+  const confirmarDadosPagamento = async () => {
+    if (payment.session || loading) return;
+    const cpfDigits = cpf.replace(/\D/g, '');
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setPaymentDataError('Coloque um e-mail válido para gerar o PIX.');
+      return;
+    }
+    if (cpfDigits.length !== 11) {
+      setPaymentDataError('Confira o CPF antes de gerar o PIX.');
+      return;
     }
 
-    setModalPixOpen(true);
-    if (!payment.session) await payment.start({
+    setPaymentDataError('');
+    trackMetric('checkout_click');
+    await payment.start({
       nomeCasal,
       dataInicio,
       mensagem,
@@ -677,15 +690,6 @@ export default function Home() {
               <textarea rows={4} value={mensagem} onChange={(e) => setMensagem(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500" />
             </div>
 
-            <div>
-              <label htmlFor="payer-email" className="block text-sm font-medium text-slate-300 mb-1">Seu e-mail</label>
-              <input id="payer-email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3" />
-            </div>
-            <div>
-              <label htmlFor="payer-cpf" className="block text-sm font-medium text-slate-300 mb-1">Seu CPF</label>
-              <input id="payer-cpf" inputMode="numeric" maxLength={14} value={cpf} onChange={e => setCpf(formatCpf(e.target.value))} placeholder="000.000.000-00" className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3" />
-              <p className="text-xs text-slate-400 mt-2">Dados do comprador para processar o PIX. Não aparecem na página pública.</p>
-            </div>
           </fieldset>
           {payment.session && <p className="text-sm text-slate-300">Seu pedido está salvo. Use este navegador para acompanhar a compra. A página usará os dados enviados ao gerar o PIX.</p>}
           {payment.session && !resultado && !payment.terminal && (
@@ -921,6 +925,76 @@ export default function Home() {
                 <h3 className="text-2xl font-bold text-white">Pagamento Confirmado!</h3>
                 <p className="text-slate-400 text-sm">Seu presente foi salvo. Feche esta janela para copiar o link e baixar o QR Code.</p>
               </div>
+            ) : !payment.session && !payment.checkout ? (
+              <>
+                <div>
+                  <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs px-3 py-1 rounded-full font-semibold">
+                    Última etapa
+                  </span>
+                  <h3 className="text-2xl font-bold text-white mt-3">Dados para gerar o PIX</h3>
+                  <p className="text-slate-400 text-sm mt-2">
+                    Seu presente já está montado. Agora precisamos somente dos dados do comprador para processar o pagamento pelo Mercado Pago.
+                  </p>
+                  <div className="text-3xl font-extrabold text-rose-400 mt-3">{priceLabel}</div>
+                </div>
+
+                <div className="text-left space-y-3">
+                  <div>
+                    <label htmlFor="modal-payer-email" className="block text-sm font-medium text-slate-300 mb-1">E-mail do comprador</label>
+                    <input
+                      id="modal-payer-email"
+                      type="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="seuemail@exemplo.com"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-rose-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="modal-payer-cpf" className="block text-sm font-medium text-slate-300 mb-1">CPF do comprador</label>
+                    <input
+                      id="modal-payer-cpf"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={14}
+                      value={cpf}
+                      onChange={e => setCpf(formatCpf(e.target.value))}
+                      placeholder="000.000.000-00"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-rose-500"
+                    />
+                  </div>
+
+                  <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
+                    <div className="flex gap-2 items-start">
+                      <Lock size={15} className="text-emerald-400 mt-0.5 shrink-0" />
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Esses dados são usados somente para processar o PIX e não aparecem na página pública do presente.
+                      </p>
+                    </div>
+                  </div>
+
+                  {paymentDataError && (
+                    <p role="alert" className="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                      {paymentDataError}
+                    </p>
+                  )}
+                  {payment.error && <p role="alert" className="text-sm text-amber-300">{payment.error}</p>}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={confirmarDadosPagamento}
+                  disabled={loading}
+                  className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {loading ? <Loader2 className="animate-spin" size={18} /> : <Lock size={18} />}
+                  {loading ? 'Gerando PIX...' : `Continuar e gerar PIX (${priceLabel})`}
+                </button>
+
+                <p className="text-[11px] text-slate-500">Você pode fechar esta janela sem gerar nenhuma cobrança.</p>
+              </>
             ) : (
               <>
                 <div>
@@ -928,11 +1002,10 @@ export default function Home() {
                     Pagamento Único via PIX
                   </span>
                   <h3 className="text-2xl font-bold text-white mt-3">Libere seu Presente</h3>
-                  <p className="text-slate-400 text-xs mt-1">Escaneie o PIX real do Mercado Pago no seu app do banco.</p>
+                  <p className="text-slate-400 text-xs mt-1">Escaneie o PIX do Mercado Pago no seu app do banco.</p>
                   <div className="text-3xl font-extrabold text-rose-400 mt-2">{priceLabel}</div>
                 </div>
 
-                {/* QR Code Real Gerado pelo Mercado Pago */}
                 <div className="bg-white p-4 inline-block rounded-2xl shadow-inner border">
                   {pixQrCodeBase64 ? (
                     <img
@@ -948,11 +1021,11 @@ export default function Home() {
                   <p className="text-slate-800 text-[10px] font-bold mt-2">Abra o app do seu banco e escaneie</p>
                 </div>
 
-                {/* Chave Copia e Cola Real */}
                 <div className="space-y-2">
                   <button
                     onClick={copiarPix}
-                    className="w-full bg-slate-950 border border-slate-700 hover:border-rose-500 p-2.5 rounded-xl text-xs text-slate-300 font-mono flex items-center justify-between transition group cursor-pointer"
+                    disabled={!pixCopiaECola}
+                    className="w-full bg-slate-950 border border-slate-700 hover:border-rose-500 disabled:opacity-60 p-2.5 rounded-xl text-xs text-slate-300 font-mono flex items-center justify-between transition group cursor-pointer"
                   >
                     <span className="truncate pr-2">{pixCopiaECola || 'Carregando chave PIX...'}</span>
                     <span className="bg-rose-600 group-hover:bg-rose-500 text-white px-3 py-1 rounded text-[11px] font-sans font-medium shrink-0 flex items-center gap-1">
@@ -964,7 +1037,7 @@ export default function Home() {
 
                 <div className="flex items-center justify-center gap-2 text-xs text-slate-400 pt-1">
                   <Loader2 className="animate-spin text-rose-500" size={14} />
-                  <span>{payment.checkout?.status === 'approved' ? 'Pagamento recebido. Preparando seu presente...' : payment.session ? 'Acompanhando seu pedido automaticamente...' : 'Confira os dados do formulário para continuar.'}</span>
+                  <span>{payment.checkout?.status === 'approved' ? 'Pagamento recebido. Preparando seu presente...' : 'Acompanhando seu pedido automaticamente...'}</span>
                 </div>
 
                 {payment.session && (
