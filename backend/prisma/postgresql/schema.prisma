@@ -28,6 +28,7 @@ model Order {
   payerCpf    String
   amountCents Int      @default(1990)
   paymentId   String?  @unique
+  promoCodeHash String? @unique
   status      String   @default("pending")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
