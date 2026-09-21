@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { API_URL } from '@/lib/api';
 
 type Session = { orderId: string; token: string };
-type Draft = { nomeCasal: string; dataInicio: string; mensagem: string; fotoUrl: string; fotoUrls?: string[]; spotifyTrackId: string; email: string; cpf: string };
-type Checkout = { pageData: Omit<Draft, 'email' | 'cpf'>; status: string; result: { url: string; qrCode: string } | null; qrCodeBase64: string | null; qrCodeCopiaCola: string };
+type Draft = { nomeCasal: string; dataInicio: string; mensagem: string; fotoUrl: string; fotoUrls?: string[]; spotifyTrackId: string; email: string; cpf: string; promoCode?: string };
+type Checkout = { pageData: Omit<Draft, 'email' | 'cpf' | 'promoCode'>; status: string; amountCents: number; result: { url: string; qrCode: string } | null; qrCodeBase64: string | null; qrCodeCopiaCola: string };
 const KEY = 'lovepage.checkout.v1';
 const terminal = new Set(['cancelled', 'rejected', 'refunded', 'charged_back']);
 export function useCheckout() {
@@ -68,7 +68,7 @@ export function useCheckout() {
       });
       const data = await res.json();
       if (!res.ok) {
-        if ([400, 413, 429].includes(res.status)) { localStorage.removeItem(KEY); setSession(null); }
+        if ([400, 409, 413, 429].includes(res.status)) { localStorage.removeItem(KEY); setSession(null); }
         throw new Error(data.error || 'Não foi possível iniciar o pagamento.');
       }
       setCheckout(data);
