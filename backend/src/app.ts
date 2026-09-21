@@ -52,7 +52,16 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: {
   };
   app.get('/health', async (_req, res) => { await prisma.$queryRaw`SELECT 1`; res.json({ ok: true }); });
 
-  const metricTypes = new Set(['landing_view', 'checkout_click', 'page_view', 'whatsapp_share']);
+  const metricTypes = new Set([
+    'landing_view',
+    'template_select',
+    'customization_complete',
+    'payment_step_open',
+    'checkout_click',
+    'pix_created',
+    'page_view',
+    'whatsapp_share',
+  ]);
   app.post('/api/metrics', rateLimit({ windowMs: 60000, limit: 120 }), async (req, res) => {
     const type = typeof req.body?.type === 'string' ? req.body.type : '';
     const orderId = typeof req.body?.orderId === 'string' && req.body.orderId.length <= 80 ? req.body.orderId : null;
@@ -139,7 +148,11 @@ export function createApp(prisma: PrismaClient, gateway: Gateway, config: {
       },
       metrics30d: {
         landingViews: metrics.landing_view || 0,
+        templateSelections: metrics.template_select || 0,
+        customizationComplete: metrics.customization_complete || 0,
+        paymentStepOpens: metrics.payment_step_open || 0,
         checkoutClicks: metrics.checkout_click || 0,
+        pixCreated: metrics.pix_created || 0,
         pageViews: metrics.page_view || 0,
         whatsappShares: metrics.whatsapp_share || 0,
       },
