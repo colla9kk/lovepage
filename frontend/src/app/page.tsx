@@ -450,39 +450,79 @@ export default function Home() {
 
           <fieldset disabled={!!payment.session || loading} className="space-y-4 disabled:opacity-70">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Nome do Casal</label>
-              <input type="text" value={nomeCasal} onChange={(e) => setNomeCasal(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500" />
+              <label className="block text-sm font-medium text-slate-300 mb-1">{templateCopy.nameLabel}</label>
+              <input
+                type="text"
+                value={nomeCasal}
+                onChange={(e) => setNomeCasal(e.target.value)}
+                placeholder={templateCopy.namePlaceholder}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1 flex items-center gap-2">
-                <Calendar size={16} /> Data do Início
+                <Calendar size={16} /> {templateCopy.dateLabel}
               </label>
               <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500" />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-                <Palette size={16} /> Estilo da página
+                <Palette size={16} /> Para quem é o presente?
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {([
-                  ['romantic', 'Romântico', 'Rosa clássico'],
-                  ['midnight', 'Midnight', 'Roxo escuro'],
-                  ['minimal', 'Minimal', 'Limpo e neutro'],
+                  ['romantic', '❤️ Romântico', 'Casal, contador e carta de amor'],
+                  ['friend', '🤝 Amizade', 'Memórias, resenhas e parceria'],
+                  ['family', '🏡 Família', 'Homenagem, carinho e gratidão'],
                 ] as const).map(([value, label, hint]) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setThemeInput(value)}
-                    className={`rounded-xl border p-3 text-left transition ${theme === value ? 'border-rose-500 bg-rose-500/10' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}
+                    className={`rounded-xl border p-3 text-left transition ${template === value ? 'border-rose-500 bg-rose-500/10' : 'border-slate-700 bg-slate-950 hover:border-slate-600'}`}
                   >
                     <span className="block text-sm font-semibold">{label}</span>
                     <span className="block text-[10px] text-slate-500 mt-1">{hint}</span>
                   </button>
                 ))}
               </div>
+              <p className="text-[11px] text-slate-500 mt-2">Cada modelo muda a estrutura e os textos da página, não só as cores.</p>
             </div>
+
+            {template !== 'romantic' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  {template === 'friend' ? 'Apelido / como você chama essa pessoa (opcional)' : 'Parentesco (opcional)'}
+                </label>
+                <input
+                  type="text"
+                  value={relationLabel}
+                  onChange={(e) => setRelationLabel(e.target.value)}
+                  placeholder={template === 'friend' ? 'Ex: meu parceiro de crime' : 'Ex: mãe, pai, irmã, avó...'}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+            )}
+
+            {template !== 'romantic' && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-300">
+                  {template === 'friend' ? '3 memórias / motivos que definem essa amizade' : '3 lembranças / motivos de gratidão'}
+                </label>
+                {highlightsInput.map((item, index) => (
+                  <input
+                    key={index}
+                    type="text"
+                    value={item}
+                    onChange={(e) => setHighlights(previous => previous.map((value, itemIndex) => itemIndex === index ? e.target.value : value))}
+                    placeholder={template === 'friend' ? `Memória ${index + 1} (opcional)` : `Lembrança ${index + 1} (opcional)`}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                ))}
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1 flex items-center gap-2">
@@ -505,7 +545,7 @@ export default function Home() {
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-                <ImageIcon size={16} /> Álbum do Casal
+                <ImageIcon size={16} /> {templateCopy.albumLabel}
               </label>
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3 flex-wrap">
@@ -561,7 +601,7 @@ export default function Home() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Carta / Mensagem Romântica</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">{templateCopy.messageLabel}</label>
               <textarea rows={4} value={mensagem} onChange={(e) => setMensagem(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500" />
             </div>
 
