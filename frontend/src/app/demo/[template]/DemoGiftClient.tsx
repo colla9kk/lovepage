@@ -7,7 +7,7 @@ type Template = 'romantic' | 'friend' | 'family';
 
 const demos = {
   romantic: {
-    names: 'Lucas & Sofia',
+    names: 'Seu amor',
     relation: 'desde 14 de fevereiro de 2023',
     message: 'Eu escolheria você em todas as versões da minha vida. Obrigado por transformar dias comuns nas minhas memórias favoritas.',
     highlights: [] as string[],
@@ -18,7 +18,7 @@ const demos = {
     ],
   },
   friend: {
-    names: 'Rafa',
+    names: 'Seu amigo',
     relation: 'meu parceiro de todas as resenhas',
     message: 'Tem gente que chega e vira parte da rotina. Você virou parte das histórias que eu mais gosto de contar. Valeu por cada rolê, conselho e risada sem sentido.',
     highlights: [
@@ -33,7 +33,7 @@ const demos = {
     ],
   },
   family: {
-    names: 'Mãe',
+    names: 'Pessoa especial',
     relation: 'minha maior referência',
     message: 'Obrigado por estar em cada fase, por acreditar quando eu mesmo duvidei e por fazer da nossa casa um lugar que sempre dá vontade de voltar.',
     highlights: [
@@ -60,7 +60,7 @@ function Carousel({ photos, square = false }: { photos: string[]; square?: boole
   return (
     <div className="space-y-3">
       <div className={`relative overflow-hidden shadow-2xl ${square ? 'aspect-square' : 'aspect-[4/5]'}`}>
-        <img src={photos[index]} alt="Exemplo de foto do presente" className="w-full h-full object-cover" />
+        <img src={photos[index]} alt="Foto do presente" className="w-full h-full object-cover" />
         <button
           onClick={() => setIndex(value => (value - 1 + photos.length) % photos.length)}
           className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
